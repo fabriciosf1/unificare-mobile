@@ -15,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getDrugCatalog, requestMedication, type Drug } from '../services/patient.service';
+import { getFamilyDrugCatalog, createFamilyMedication } from '../services/family.service';
+import type { Drug } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 const FREQUENCIES = [
@@ -31,7 +32,7 @@ function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
 }
 
-export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
+export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
   const [drugs, setDrugs] = useState<Drug[]>([]);
   const [loadingDrugs, setLoadingDrugs] = useState(true);
 
@@ -47,7 +48,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
-    getDrugCatalog()
+    getFamilyDrugCatalog()
       .then(setDrugs)
       .catch(() => Alert.alert('Erro', 'Não foi possível carregar a lista de remédios.'))
       .finally(() => setLoadingDrugs(false));
@@ -77,7 +78,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
 
     setSaving(true);
     try {
-      await requestMedication({
+      await createFamilyMedication({
         name: selectedDrug.name,
         dosage,
         frequency,
@@ -85,7 +86,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         start_date: new Date().toISOString().slice(0, 10),
         notes: notes || undefined,
       });
-      Alert.alert('Enviado', 'Seu remédio foi cadastrado e aguarda aprovação da sua família.');
+      Alert.alert('Cadastrado', 'O remédio foi cadastrado para o paciente.');
       onSaved();
     } catch {
       Alert.alert('Erro', 'Não foi possível cadastrar o remédio. Tente novamente.');
@@ -111,11 +112,11 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={styles.subtitle}>Fica pendente de aprovação da sua família antes de valer.</Text>
+      <Text style={styles.subtitle}>Cadastra direto para o paciente, sem precisar de aprovação.</Text>
 
       <TouchableOpacity style={styles.input} onPress={() => setShowNamePicker(true)} activeOpacity={0.75} disabled={loadingDrugs}>
         {loadingDrugs ? (
-          <ActivityIndicator color={colors.green} />
+          <ActivityIndicator color={colors.blue} />
         ) : (
           <Text style={selectedDrug ? styles.pickerValue : styles.pickerPlaceholder}>
             {selectedDrug ? selectedDrug.name : '💊 Selecionar remédio'}
@@ -195,7 +196,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       />
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar para aprovação</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Cadastrar</Text>}
       </TouchableOpacity>
 
       <Modal visible={showNamePicker} animationType="slide" onRequestClose={() => setShowNamePicker(false)}>
@@ -229,14 +230,14 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.greenSurface },
+  container: { flex: 1, backgroundColor: colors.blueSurface },
   scroll: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.greenDark,
+    backgroundColor: colors.blueDark,
     paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -293,21 +294,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.card,
   },
-  chipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  chipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { color: colors.text, fontWeight: '600' },
   chipTextActive: { color: '#fff', fontWeight: '600' },
   addTimeChip: {
     borderWidth: 1.5,
-    borderColor: colors.green,
+    borderColor: colors.blue,
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.greenDim,
+    backgroundColor: colors.blueDim,
   },
-  addTimeChipText: { color: colors.green, fontWeight: '700' },
+  addTimeChipText: { color: colors.blue, fontWeight: '700' },
   muted: { fontSize: typography.label, color: colors.muted },
   button: {
-    backgroundColor: colors.green,
+    backgroundColor: colors.blue,
     height: buttonHeight,
     borderRadius: 12,
     alignItems: 'center',
@@ -315,20 +316,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   buttonText: { color: '#fff', fontSize: typography.subtitle, fontWeight: '700' },
-  modalContainer: { flex: 1, backgroundColor: colors.greenSurface, padding: spacing.lg, paddingTop: spacing.xl },
+  modalContainer: { flex: 1, backgroundColor: colors.blueSurface, padding: spacing.lg, paddingTop: spacing.xl },
   modalCancel: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
     height: buttonHeight - 16,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: colors.green,
-    backgroundColor: colors.greenDim,
+    borderColor: colors.blue,
+    backgroundColor: colors.blueDim,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.md,
   },
-  modalCancelText: { fontSize: typography.label, color: colors.green, fontWeight: '700' },
+  modalCancelText: { fontSize: typography.label, color: colors.blue, fontWeight: '700' },
   drugRow: {
     paddingVertical: spacing.md,
     borderBottomWidth: 1,

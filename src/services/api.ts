@@ -1,4 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { API_BASE_URL } from '../config';
 
 const TOKEN_KEY = 'uc_patient_token';
@@ -72,6 +74,23 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function downloadAndOpen(path: string, fileName: string): Promise<void> {
+  const token = await getToken();
+  const destination = new File(Paths.cache, fileName);
+
+  const task = File.createDownloadTask(`${API_BASE_URL}${path}`, destination, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const file = await task.downloadAsync();
+  if (!file) {
+    throw new Error('Não foi possível baixar o arquivo.');
+  }
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(file.uri);
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -79,4 +98,5 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   upload: <T>(path: string, formData: FormData) => upload<T>(path, formData),
+  downloadAndOpen,
 };

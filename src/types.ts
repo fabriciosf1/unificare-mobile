@@ -60,6 +60,17 @@ export interface Appointment {
   notes: string | null;
 }
 
+export interface PatientContact {
+  id: number;
+  uuid: string;
+  patient_id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  relationship: string | null;
+  is_primary: boolean;
+}
+
 export interface FamilyContact {
   uuid: string;
   name: string;
@@ -94,5 +105,15 @@ export interface AlertEvent {
   severity: 'attention' | 'critical';
   status: string;
   description: string | null;
+  created_at: string;
+}
+
+export interface ExamResult {
+  uuid: string;
+  exam_type: string;
+  exam_date: string;
+  observations: string | null;
+  file_name: string | null;
+  source: 'staff' | 'patient' | 'family';
   created_at: string;
 }

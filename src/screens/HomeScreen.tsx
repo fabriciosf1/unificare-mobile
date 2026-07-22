@@ -15,8 +15,7 @@ import {
   View,
 } from 'react-native';
 import { logout, me } from '../services/auth.service';
-import { getLatestVital, getTodayMedications, logMedication, setMyGeofence } from '../services/patient.service';
-import { getCurrentPosition } from '../services/location.service';
+import { getLatestVital, getTodayMedications, logMedication } from '../services/patient.service';
 import { MEDICATION_TAKEN_EVENT, snoozeMedicationAlarm, syncMedicationAlarms } from '../services/alarm.service';
 import type { Medication, MedicationDose, Patient, VitalSign } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -28,14 +27,18 @@ export default function HomeScreen({
   onOpenHistory,
   onAddMedication,
   onAddAppointment,
+  onAddExam,
   onOpenProfile,
+  onOpenFamiliares,
   onOpenSosCamera,
 }: {
   onLoggedOut: () => void;
   onOpenHistory: () => void;
   onAddMedication: () => void;
   onAddAppointment: () => void;
+  onAddExam: () => void;
   onOpenProfile: () => void;
+  onOpenFamiliares: () => void;
   onOpenSosCamera: (patientId: number) => void;
 }) {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -43,7 +46,6 @@ export default function HomeScreen({
   const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [settingHome, setSettingHome] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{ title: string; message?: string } | null>(null);
 
   const loadData = useCallback(async () => {
@@ -114,19 +116,6 @@ export default function HomeScreen({
       // token pode já estar inválido no servidor — segue o logout local mesmo assim
     }
     onLoggedOut();
-  }
-
-  async function handleSetHome() {
-    setSettingHome(true);
-    try {
-      const coords = await getCurrentPosition();
-      await setMyGeofence(coords.latitude, coords.longitude);
-      setAlertInfo({ title: 'Enviado', message: 'Sua solicitação de nova localização para "minha casa" foi enviada e aguarda aprovação da sua família.' });
-    } catch {
-      setAlertInfo({ title: 'Erro', message: 'Não foi possível obter sua localização. Verifique a permissão de GPS.' });
-    } finally {
-      setSettingHome(false);
-    }
   }
 
   const pendingMeds = medications.filter((m) => m.approval_status === 'pending');
@@ -302,15 +291,13 @@ export default function HomeScreen({
           <Text style={styles.footerIcon}>🗓️</Text>
           <Text style={styles.footerLabel}>Consulta</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={handleSetHome} activeOpacity={0.75} disabled={settingHome}>
-          {settingHome ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.footerIcon}>📍</Text>
-              <Text style={styles.footerLabel}>Minha casa</Text>
-            </>
-          )}
+        <TouchableOpacity style={styles.footerItem} onPress={onAddExam} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>📄</Text>
+          <Text style={styles.footerLabel}>Documento</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenFamiliares} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>👪</Text>
+          <Text style={styles.footerLabel}>Familiares</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,5 +1,6 @@
 import { api } from './api';
-import type { FamilyContact, PendingApprovals, VitalSign } from '../types';
+import type { AlertEvent, Appointment, ExamResult, FamilyContact, Medication, PendingApprovals, VitalSign } from '../types';
+import type { Drug } from './patient.service';
 
 export function familyMe(): Promise<FamilyContact> {
   return api.get<FamilyContact>('/family/me');
@@ -52,4 +53,82 @@ export function getLatestLocation(): Promise<LatestLocationResponse> {
 
 export function registerFamilyPushToken(expoPushToken: string, platform: string): Promise<void> {
   return api.post('/family/push/subscribe', { expo_push_token: expoPushToken, platform });
+}
+
+export function getFamilyAlerts(): Promise<{ data: AlertEvent[] }> {
+  return api.get<{ data: AlertEvent[] }>('/family/alerts');
+}
+
+export function getFamilyMedicationsToday(): Promise<Medication[]> {
+  return api.get<Medication[]>('/family/medications/today');
+}
+
+export function logFamilyMedication(medicationUuid: string, scheduledAt: string): Promise<void> {
+  return api.post(`/family/medications/${medicationUuid}/log`, {
+    status: 'taken',
+    scheduled_at: scheduledAt,
+    taken_at: new Date().toISOString(),
+  });
+}
+
+export function requestCamera(): Promise<void> {
+  return api.post('/family/camera/request');
+}
+
+export function getFamilyDrugCatalog(): Promise<Drug[]> {
+  return api.get<Drug[]>('/family/drugs');
+}
+
+export interface NewMedicationInput {
+  name: string;
+  dosage: string;
+  frequency: string;
+  schedule_times: string[];
+  start_date: string;
+  notes?: string;
+}
+
+export function createFamilyMedication(data: NewMedicationInput): Promise<Medication> {
+  return api.post<Medication>('/family/medications', data);
+}
+
+export interface NewAppointmentInput {
+  appointment_date: string;
+  appointment_time: string;
+  type: 'consulta' | 'exame' | 'retorno' | 'outro';
+  professional?: string;
+  location?: string;
+  notes?: string;
+}
+
+export function createFamilyAppointment(data: NewAppointmentInput): Promise<Appointment> {
+  return api.post<Appointment>('/family/appointments', data);
+}
+
+export interface NewExamInput {
+  exam_type: string;
+  exam_date: string;
+  observations?: string;
+  file: { uri: string; name: string; mimeType: string };
+}
+
+export function uploadFamilyExam(data: NewExamInput): Promise<void> {
+  const formData = new FormData();
+  formData.append('exam_type', data.exam_type);
+  formData.append('exam_date', data.exam_date);
+  if (data.observations) formData.append('observations', data.observations);
+  formData.append('file', {
+    uri: data.file.uri,
+    name: data.file.name,
+    type: data.file.mimeType,
+  } as unknown as Blob);
+  return api.upload('/family/exams', formData);
+}
+
+export function getFamilyExams(): Promise<ExamResult[]> {
+  return api.get<ExamResult[]>('/family/exams');
+}
+
+export function openFamilyExam(exam: ExamResult): Promise<void> {
+  return api.downloadAndOpen(`/family/exams/${exam.uuid}/view`, exam.file_name ?? `${exam.exam_type}.jpg`);
 }

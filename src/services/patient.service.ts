@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AlertEvent, Appointment, Medication, VitalSign } from '../types';
+import type { AlertEvent, Appointment, ExamResult, Medication, PatientContact, VitalSign } from '../types';
 
 export interface Drug {
   id: number;
@@ -30,6 +30,10 @@ export function logMedication(medicationId: number, scheduledAt: string): Promis
 
 export function getMyAlerts(): Promise<{ data: AlertEvent[] }> {
   return api.get<{ data: AlertEvent[] }>('/me/alerts');
+}
+
+export function getMyContacts(): Promise<PatientContact[]> {
+  return api.get<PatientContact[]>('/me/contacts');
 }
 
 export function triggerSos(): Promise<AlertEvent> {
@@ -110,4 +114,32 @@ export function uploadMyPhoto(uri: string): Promise<{ photo_url: string }> {
     type: 'image/jpeg',
   } as unknown as Blob);
   return api.upload<{ photo_url: string }>('/me/photo', formData);
+}
+
+export interface NewExamInput {
+  exam_type: string;
+  exam_date: string;
+  observations?: string;
+  file: { uri: string; name: string; mimeType: string };
+}
+
+export function uploadMyExam(data: NewExamInput): Promise<void> {
+  const formData = new FormData();
+  formData.append('exam_type', data.exam_type);
+  formData.append('exam_date', data.exam_date);
+  if (data.observations) formData.append('observations', data.observations);
+  formData.append('file', {
+    uri: data.file.uri,
+    name: data.file.name,
+    type: data.file.mimeType,
+  } as unknown as Blob);
+  return api.upload('/me/exams', formData);
+}
+
+export function getMyExams(): Promise<ExamResult[]> {
+  return api.get<ExamResult[]>('/me/exams');
+}
+
+export function openMyExam(exam: ExamResult): Promise<void> {
+  return api.downloadAndOpen(`/me/exams/${exam.uuid}/view`, exam.file_name ?? `${exam.exam_type}.jpg`);
 }

@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { requestAppointment } from '../services/patient.service';
+import { createFamilyAppointment } from '../services/family.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 function formatDate(d: Date) {
@@ -36,7 +36,7 @@ const TYPES: { value: 'consulta' | 'exame' | 'retorno' | 'outro'; label: string 
   { value: 'outro', label: 'Outro' },
 ];
 
-export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
+export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [type, setType] = useState<'consulta' | 'exame' | 'retorno' | 'outro'>('consulta');
@@ -55,7 +55,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
 
     setSaving(true);
     try {
-      await requestAppointment({
+      await createFamilyAppointment({
         appointment_date: date,
         appointment_time: time,
         type,
@@ -63,10 +63,10 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
         location: location || undefined,
         notes: notes || undefined,
       });
-      Alert.alert('Enviado', 'Sua solicitação de consulta foi enviada e aguarda aprovação da sua família.');
+      Alert.alert('Agendado', 'A consulta foi cadastrada para o paciente.');
       onSaved();
     } catch {
-      Alert.alert('Erro', 'Não foi possível solicitar a consulta. Tente novamente.');
+      Alert.alert('Erro', 'Não foi possível agendar a consulta. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -79,7 +79,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
           <View style={styles.headerLogoWrap}>
             <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
           </View>
-          <Text style={styles.headerTitle}>Solicitar consulta</Text>
+          <Text style={styles.headerTitle}>Agendar consulta</Text>
         </View>
         <TouchableOpacity style={styles.back} onPress={onBack} activeOpacity={0.75} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={styles.backText}>‹ Voltar</Text>
@@ -87,7 +87,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={styles.subtitle}>Fica pendente de aprovação da sua família antes de valer.</Text>
+      <Text style={styles.subtitle}>Agendada direto para o paciente, sem precisar de aprovação.</Text>
 
       <View style={styles.typeRow}>
         {TYPES.map((t) => (
@@ -154,7 +154,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
       />
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar para aprovação</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Agendar</Text>}
       </TouchableOpacity>
       </ScrollView>
     </View>
@@ -162,14 +162,14 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.greenSurface },
+  container: { flex: 1, backgroundColor: colors.blueSurface },
   scroll: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.greenDark,
+    backgroundColor: colors.blueDark,
     paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.card,
   },
-  typeChipActive: { backgroundColor: colors.green, borderColor: colors.green },
+  typeChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   typeChipText: { color: colors.text, fontWeight: '600' },
   typeChipTextActive: { color: '#fff' },
   input: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   pickerPlaceholder: { fontSize: typography.body, color: colors.hint },
   notesInput: { height: buttonHeight * 1.5, paddingTop: spacing.md, textAlignVertical: 'top' },
   button: {
-    backgroundColor: colors.green,
+    backgroundColor: colors.blue,
     height: buttonHeight,
     borderRadius: 12,
     alignItems: 'center',

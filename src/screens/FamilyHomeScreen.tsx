@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,28 +25,62 @@ import {
   rejectAppointment,
   rejectGeofence,
   rejectMedication,
+  requestCamera,
 } from '../services/family.service';
 import type { Appointment, FamilyContact, Medication, PendingApprovals } from '../types';
 import { colors, spacing, typography } from '../theme';
 
-function buildMapHtml(lat: number, lng: number, radius: number, name: string): string {
-  const safeName = name.replace(/</g, '&lt;').replace(/'/g, '&#39;');
+function buildMapHtml(lat: number, lng: number, radius: number, name: string, photoUrl: string | null): string {
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>html,body,#map{height:100%;margin:0;padding:0;}</style>
+  <style>
+    html,body,#map{height:100%;margin:0;padding:0;}
+    .marker-pin {
+      width: 46px;
+      height: 46px;
+      border-radius: 50% 50% 50% 0;
+      background: ${colors.teal};
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    }
+    .marker-pin img {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      transform: rotate(45deg);
+    }
+  </style>
 </head>
 <body>
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([${lat}, ${lng}], 15);
+    const map = L.map('map').setView([${lat}, ${lng}], 17);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-    L.marker([${lat}, ${lng}]).addTo(map).bindPopup('${safeName}');
+
+    const photoUrl = ${JSON.stringify(photoUrl)};
+    const marker = photoUrl
+      ? L.marker([${lat}, ${lng}], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="marker-pin"><img src="' + photoUrl + '" /></div>',
+            iconSize: [46, 46],
+            iconAnchor: [23, 46],
+            popupAnchor: [0, -42],
+          }),
+        })
+      : L.marker([${lat}, ${lng}]);
+    marker.addTo(map).bindPopup(${JSON.stringify(name)});
+
     L.circle([${lat}, ${lng}], {
       radius: ${radius},
       color: '${colors.teal}',
@@ -55,13 +92,28 @@ function buildMapHtml(lat: number, lng: number, radius: number, name: string): s
 </html>`;
 }
 
-export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => void }) {
+export default function FamilyHomeScreen({
+  onLoggedOut,
+  onOpenAlerts,
+  onOpenMedications,
+  onOpenCamera,
+  onOpenAddExam,
+  onOpenAddAppointment,
+}: {
+  onLoggedOut: () => void;
+  onOpenAlerts: () => void;
+  onOpenMedications: () => void;
+  onOpenCamera: (patientId: number, patientName: string) => void;
+  onOpenAddExam: () => void;
+  onOpenAddAppointment: () => void;
+}) {
   const [contact, setContact] = useState<FamilyContact | null>(null);
   const [pending, setPending] = useState<PendingApprovals>({ medications: [], appointments: [] });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [safeRadius, setSafeRadius] = useState(500);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [requestingCamera, setRequestingCamera] = useState(false);
 
   const loadData = useCallback(async () => {
     const [c, p, loc] = await Promise.all([familyMe(), getPendingApprovals(), getLatestLocation()]);
@@ -121,6 +173,19 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
     }
   }
 
+  async function handleRequestCamera() {
+    if (!contact) return;
+    setRequestingCamera(true);
+    try {
+      await requestCamera();
+      onOpenCamera(contact.patient.id, contact.patient.name);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível solicitar a câmera agora.');
+    } finally {
+      setRequestingCamera(false);
+    }
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -132,35 +197,36 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
   const hasPending = pending.medications.length > 0 || pending.appointments.length > 0 || !!pending.geofence;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <View style={styles.header}>
+    <View style={styles.screen}>
+      <View style={styles.headerBar}>
         <View style={styles.headerLeft}>
           <View style={styles.headerLogoWrap}>
             <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
           </View>
           <Text style={styles.greeting}>{contact?.patient.name}</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout}>
+        <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={styles.logout}>Sair</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Localização</Text>
-        {location ? (
-          <WebView
-            style={styles.map}
-            originWhitelist={['*']}
-            source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '') }}
-          />
-        ) : (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+    >
+      <Text style={styles.mapSectionTitle}>Localização</Text>
+      {location ? (
+        <WebView
+          style={styles.map}
+          originWhitelist={['*']}
+          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', contact?.patient.photo_url ?? null) }}
+        />
+      ) : (
+        <View style={styles.card}>
           <Text style={styles.muted}>Ainda sem localização registrada.</Text>
-        )}
-      </View>
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Pendências para aprovar</Text>
@@ -220,31 +286,87 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
         ))}
       </View>
     </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenAlerts} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>🚨</Text>
+          <Text style={styles.footerLabel}>Alertas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenMedications} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>💊</Text>
+          <Text style={styles.footerLabel}>Remédios</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={handleRequestCamera} activeOpacity={0.75} disabled={requestingCamera}>
+          {requestingCamera ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.footerIcon}>📹</Text>
+              <Text style={styles.footerLabel}>Câmera</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenAddExam} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>📄</Text>
+          <Text style={styles.footerLabel}>Documento</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenAddAppointment} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>🗓️</Text>
+          <Text style={styles.footerLabel}>Consulta</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+  screen: { flex: 1, backgroundColor: colors.blueSurface },
+  container: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  header: {
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blueSurface },
+  footer: {
+    flexDirection: 'row',
+    backgroundColor: colors.blueDark,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: (Platform.OS === 'ios' ? spacing.lg : spacing.sm),
+    gap: spacing.sm,
+  },
+  footerItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  footerIcon: { fontSize: 22 },
+  footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
+  headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    backgroundColor: colors.blueDark,
+    paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
   headerLogoWrap: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.blueDark,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerLogo: { width: 22, height: 22 },
-  greeting: { fontSize: typography.title, fontWeight: '700', color: colors.text },
-  logout: { fontSize: typography.label, color: colors.muted, fontWeight: '600' },
+  greeting: { fontSize: typography.subtitle, fontWeight: '700', color: '#fff', flexShrink: 1 },
+  logout: { fontSize: typography.label, color: '#fff', fontWeight: '700', opacity: 0.9 },
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,
@@ -255,7 +377,19 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   muted: { fontSize: typography.label, color: colors.muted },
-  map: { width: '100%', height: 220, borderRadius: 12 },
+  mapSectionTitle: {
+    fontSize: typography.subtitle,
+    fontWeight: '700',
+    color: colors.text,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  map: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.5,
+    marginHorizontal: -spacing.lg,
+    marginBottom: spacing.md,
+  },
   pendingRow: {
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
