@@ -4,7 +4,17 @@ export interface Patient {
   name: string;
   photo_url: string | null;
   age: number | null;
+  password_must_change?: boolean;
   threshold?: Record<string, unknown>;
+  phone: string | null;
+  cep: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  reference_point: string | null;
 }
 
 export interface VitalSign {

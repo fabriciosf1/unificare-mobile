@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -85,7 +86,11 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
   }
 
   async function handleLogout() {
-    await familyLogout();
+    try {
+      await familyLogout();
+    } catch {
+      // token pode já estar inválido no servidor — segue o logout local mesmo assim
+    }
     onLoggedOut();
   }
 
@@ -133,7 +138,12 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       <View style={styles.header}>
-        <Text style={styles.greeting}>{contact?.patient.name}</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.headerLogoWrap}>
+            <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+          </View>
+          <Text style={styles.greeting}>{contact?.patient.name}</Text>
+        </View>
         <TouchableOpacity onPress={handleLogout}>
           <Text style={styles.logout}>Sair</Text>
         </TouchableOpacity>
@@ -223,6 +233,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerLogoWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.blueDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerLogo: { width: 22, height: 22 },
   greeting: { fontSize: typography.title, fontWeight: '700', color: colors.text },
   logout: { fontSize: typography.label, color: colors.muted, fontWeight: '600' },
   card: {

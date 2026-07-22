@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
+  DeviceEventEmitter,
+  Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,6 +17,7 @@ import {
 import { logout, me } from '../services/auth.service';
 import { getLatestVital, getTodayMedications, logMedication, setMyGeofence } from '../services/patient.service';
 import { getCurrentPosition } from '../services/location.service';
+import { MEDICATION_TAKEN_EVENT, snoozeMedicationAlarm, syncMedicationAlarms } from '../services/alarm.service';
 import type { Medication, MedicationDose, Patient, VitalSign } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import SosButton from '../components/SosButton';
@@ -22,12 +28,14 @@ export default function HomeScreen({
   onOpenHistory,
   onAddMedication,
   onAddAppointment,
+  onOpenProfile,
   onOpenSosCamera,
 }: {
   onLoggedOut: () => void;
   onOpenHistory: () => void;
   onAddMedication: () => void;
   onAddAppointment: () => void;
+  onOpenProfile: () => void;
   onOpenSosCamera: (patientId: number) => void;
 }) {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -43,25 +51,68 @@ export default function HomeScreen({
     setPatient(p);
     setVital(v);
     setMedications(meds);
+    syncMedicationAlarms(meds).catch(() => {});
   }, []);
 
   useEffect(() => {
-    loadData().finally(() => setLoading(false));
+    loadData()
+      .catch(() => setAlertInfo({ title: 'Erro', message: 'Não foi possível carregar seus dados.' }))
+      .finally(() => setLoading(false));
+  }, [loadData]);
+
+  // Botão "Tomei"/"Adiar" da notificação roda fora do React (handleAlarmAction em
+  // alarm.service.ts) e não tem como atualizar esta tela diretamente — recarrega ao
+  // voltar do background para refletir ações tomadas pela notificação.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        loadData().catch(() => {});
+      }
+      appStateRef.current = nextState;
+    });
+    return () => subscription.remove();
+  }, [loadData]);
+
+  // Cobre o caso do app já estar aberto: onForegroundEvent chama handleAlarmAction direto,
+  // sem passar pelo AppState (não há transição background→active).
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(MEDICATION_TAKEN_EVENT, () => {
+      loadData().catch(() => {});
+    });
+    return () => subscription.remove();
   }, [loadData]);
 
   async function handleRefresh() {
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+    try {
+      await loadData();
+    } catch {
+      setAlertInfo({ title: 'Erro', message: 'Não foi possível atualizar seus dados.' });
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function handleTaken(medication: Medication, dose: MedicationDose) {
-    await logMedication(medication.id, dose.scheduled_at);
-    await loadData();
+    try {
+      await logMedication(medication.id, dose.scheduled_at);
+      await loadData();
+    } catch {
+      setAlertInfo({ title: 'Erro', message: 'Não foi possível registrar o medicamento como tomado.' });
+    }
+  }
+
+  async function handleSnooze(medication: Medication, dose: MedicationDose) {
+    await snoozeMedicationAlarm(medication, dose.time, dose.scheduled_at);
   }
 
   async function handleLogout() {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // token pode já estar inválido no servidor — segue o logout local mesmo assim
+    }
     onLoggedOut();
   }
 
@@ -84,6 +135,8 @@ export default function HomeScreen({
     .flatMap((m) => m.today_doses.map((d) => ({ ...d, medication: m })))
     .sort((a, b) => a.time.localeCompare(b.time));
   const nextDose = doses.find((d) => d.status === 'pending');
+  // Botões só liberam a partir de 10min antes do horário — antes disso, dose.is_late também é false
+  const nextDoseActionable = !!nextDose && Date.now() >= new Date(nextDose.scheduled_at).getTime() - 10 * 60 * 1000;
 
   if (loading) {
     return (
@@ -94,18 +147,33 @@ export default function HomeScreen({
   }
 
   return (
+    <View style={styles.screen}>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.headerProfile} onPress={onOpenProfile} activeOpacity={0.8}>
+          {patient?.photo_url ? (
+            <Image source={{ uri: patient.photo_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarPlaceholderText}>{patient?.name?.[0] ?? '?'}</Text>
+            </View>
+          )}
+          <Text style={styles.greeting}>Olá, {patient?.name?.split(' ')[0]}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <View style={styles.headerLogoWrap}>
+            <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+          </View>
+          <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={styles.logout}>Sair</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Olá, {patient?.name?.split(' ')[0]}</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logout}>Sair</Text>
-        </TouchableOpacity>
-      </View>
-
       <SosButton onSosSuccess={() => patient && onOpenSosCamera(patient.id)} />
 
       <View style={styles.card}>
@@ -130,17 +198,29 @@ export default function HomeScreen({
         {nextDose && (
           <View style={styles.nextDoseBox}>
             <Text style={styles.nextDoseAlarm}>
-              {nextDose.is_late ? '⚠️ Atrasado — ' : '⏰ Agora — '}
+              {nextDose.is_late ? '⚠️ Atrasado — ' : nextDoseActionable ? '⏰ Agora — ' : '🕐 Próximo — '}
               {nextDose.time}
             </Text>
             <Text style={styles.nextDoseName}>{nextDose.medication.name}</Text>
             <Text style={styles.medDosage}>{nextDose.medication.dosage}</Text>
-            <TouchableOpacity
-              style={styles.takeButton}
-              onPress={() => handleTaken(nextDose.medication, nextDose)}
-            >
-              <Text style={styles.takeButtonText}>Tomei</Text>
-            </TouchableOpacity>
+            {nextDoseActionable ? (
+              <View style={styles.nextDoseActions}>
+                <TouchableOpacity
+                  style={[styles.takeButton, styles.nextDoseActionButton]}
+                  onPress={() => handleTaken(nextDose.medication, nextDose)}
+                >
+                  <Text style={styles.takeButtonText}>Tomei</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.snoozeButton, styles.nextDoseActionButton]}
+                  onPress={() => handleSnooze(nextDose.medication, nextDose)}
+                >
+                  <Text style={styles.snoozeButtonText}>Adiar 10 min</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.muted}>Os botões de confirmação liberam 10 min antes do horário.</Text>
+            )}
           </View>
         )}
 
@@ -164,7 +244,7 @@ export default function HomeScreen({
                     d.status === 'pending' && d.is_late && styles.doseStatusLate,
                   ]}
                 >
-                  {d.status === 'taken' ? '✓ Tomado' : d.is_late ? 'Atrasado' : d === nextDose ? 'Agora' : 'Aguardando'}
+                  {d.status === 'taken' ? '✓ Tomado' : d.is_late ? 'Atrasado' : d === nextDose && nextDoseActionable ? 'Agora' : 'Aguardando'}
                 </Text>
               </View>
             ))}
@@ -182,34 +262,11 @@ export default function HomeScreen({
             <Text style={styles.pendingLabel}>Aguardando aprovação</Text>
           </View>
         ))}
-
-        <TouchableOpacity style={styles.actionButton} onPress={onAddMedication} activeOpacity={0.75}>
-          <Text style={styles.actionButtonText}>+ Adicionar remédio</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Consultas</Text>
-        <TouchableOpacity style={styles.actionButton} onPress={onAddAppointment} activeOpacity={0.75}>
-          <Text style={styles.actionButtonText}>+ Solicitar consulta</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Localização</Text>
         <Text style={styles.muted}>Sua localização é compartilhada com sua família para sua segurança.</Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleSetHome}
-          activeOpacity={0.75}
-          disabled={settingHome}
-        >
-          {settingHome ? (
-            <ActivityIndicator color={colors.green} />
-          ) : (
-            <Text style={styles.actionButtonText}>📍 Definir minha casa (aqui agora)</Text>
-          )}
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.historyButton} onPress={onOpenHistory}>
@@ -235,6 +292,28 @@ export default function HomeScreen({
         </View>
       </Modal>
     </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.footerItem} onPress={onAddMedication} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>💊</Text>
+          <Text style={styles.footerLabel}>Remédio</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onAddAppointment} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>🗓️</Text>
+          <Text style={styles.footerLabel}>Consulta</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={handleSetHome} activeOpacity={0.75} disabled={settingHome}>
+          {settingHome ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.footerIcon}>📍</Text>
+              <Text style={styles.footerLabel}>Minha casa</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -248,17 +327,37 @@ function VitalItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.greenSurface },
+  screen: { flex: 1, backgroundColor: colors.greenSurface },
+  container: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.greenSurface },
-  header: {
+  headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    backgroundColor: colors.greenDark,
+    paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  greeting: { fontSize: typography.title, fontWeight: '700', color: colors.text },
-  logout: { fontSize: typography.label, color: colors.muted, fontWeight: '600' },
+  headerProfile: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  avatar: { width: 44, height: 44, borderRadius: 22, marginRight: spacing.sm },
+  avatarPlaceholder: { backgroundColor: colors.greenLight, alignItems: 'center', justifyContent: 'center' },
+  avatarPlaceholderText: { color: '#fff', fontWeight: '700', fontSize: typography.subtitle },
+  greeting: { fontSize: typography.subtitle, fontWeight: '700', color: '#fff', flexShrink: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerLogoWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerLogo: { width: 18, height: 18 },
+  logout: { fontSize: typography.label, color: '#fff', fontWeight: '700', opacity: 0.9 },
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,
@@ -291,6 +390,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   takeButtonText: { color: '#fff', fontWeight: '700', fontSize: typography.label },
+  nextDoseActions: { flexDirection: 'row', gap: spacing.sm },
+  nextDoseActionButton: { flex: 1 },
+  snoozeButton: {
+    backgroundColor: colors.surface,
+    height: buttonHeight - 12,
+    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.green,
+  },
+  snoozeButtonText: { color: colors.green, fontWeight: '700', fontSize: typography.label },
   takenLabel: { color: colors.green, fontWeight: '700', fontSize: typography.label },
   pendingLabel: { color: colors.yellow, fontWeight: '700', fontSize: 14, textAlign: 'right', maxWidth: 120 },
   nextDoseBox: {
@@ -317,18 +429,26 @@ const styles = StyleSheet.create({
   doseStatus: { fontSize: 14, color: colors.muted, fontWeight: '600' },
   doseStatusTaken: { color: colors.green },
   doseStatusLate: { color: colors.red },
-  actionButton: {
+  footer: {
     flexDirection: 'row',
+    backgroundColor: colors.greenDark,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: (Platform.OS === 'ios' ? spacing.lg : spacing.sm),
+    gap: spacing.sm,
+  },
+  footerItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: buttonHeight - 8,
+    paddingVertical: spacing.sm,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.green,
-    backgroundColor: colors.greenDim,
-    marginTop: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  actionButtonText: { color: colors.green, fontWeight: '700', fontSize: typography.label },
+  footerIcon: { fontSize: 22 },
+  footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
   historyButton: { alignItems: 'center', paddingVertical: spacing.md },
   historyButtonText: { color: colors.green, fontWeight: '700', fontSize: typography.label },
   alertBackdrop: {

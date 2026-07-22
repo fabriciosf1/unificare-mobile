@@ -23,7 +23,19 @@ const ROLE_THEME = {
   family: { dark: colors.blueDark, mid: colors.blue, light: colors.blueLight },
 };
 
-export default function LoginScreen({ onLoggedIn }: { onLoggedIn: (role: AppRole) => void }) {
+function formatCpf(digits: string) {
+  return digits
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+export default function LoginScreen({
+  onLoggedIn,
+}: {
+  onLoggedIn: (role: AppRole, mustChangePassword?: boolean) => void;
+}) {
   const [role, setRoleValue] = useState<AppRole>('patient');
   const [loginValue, setLoginValue] = useState('');
   const [password, setPassword] = useState('');
@@ -49,18 +61,19 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: (role: AppRole
     if (!loginValue || !password) {
       setAlertInfo({
         title: 'Campos obrigatórios',
-        message: role === 'patient' ? 'Preencha CPF ou telefone e senha.' : 'Preencha telefone ou e-mail e senha.',
+        message: role === 'patient' ? 'Preencha CPF e senha.' : 'Preencha e-mail e senha.',
       });
       return;
     }
     setLoading(true);
     try {
       if (role === 'patient') {
-        await login(loginValue, password);
+        const patient = await login(loginValue, password);
+        onLoggedIn(role, patient.password_must_change);
       } else {
         await familyLogin(loginValue, password);
+        onLoggedIn(role);
       }
-      onLoggedIn(role);
     } catch (err) {
       setAlertInfo({ title: 'Não foi possível entrar', message: 'Verifique seus dados e tente novamente.' });
     } finally {
@@ -91,18 +104,24 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: (role: AppRole
 
             <View style={styles.card}>
               <Text style={styles.subtitle}>
-                {role === 'patient' ? 'Entre com seu CPF ou telefone' : 'Entre com seu telefone ou e-mail'}
+                {role === 'patient' ? 'Entre com seu CPF' : 'Entre com seu e-mail'}
               </Text>
 
-              <Text style={styles.inputLabel}>{role === 'patient' ? 'CPF ou telefone' : 'Telefone ou e-mail'}</Text>
+              <Text style={styles.inputLabel}>{role === 'patient' ? 'CPF' : 'E-mail'}</Text>
               <TextInput
                 style={styles.input}
-                placeholder={role === 'patient' ? 'Ex: 12345678900' : 'Ex: (11) 90000-0000'}
+                placeholder={role === 'patient' ? 'Ex: 123.456.789-00' : 'Ex: nome@email.com'}
                 placeholderTextColor={colors.hint}
-                value={loginValue}
-                onChangeText={text => setLoginValue(role === 'patient' ? text.replace(/\D/g, '') : text)}
+                value={role === 'patient' ? formatCpf(loginValue) : loginValue}
+                onChangeText={text => {
+                  if (role === 'patient') {
+                    setLoginValue(text.replace(/\D/g, '').slice(0, 11));
+                  } else {
+                    setLoginValue(text);
+                  }
+                }}
                 autoCapitalize="none"
-                keyboardType={role === 'patient' ? 'number-pad' : 'default'}
+                keyboardType={role === 'patient' ? 'number-pad' : 'email-address'}
               />
 
               <Text style={styles.inputLabel}>Senha</Text>

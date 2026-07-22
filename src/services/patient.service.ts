@@ -1,6 +1,17 @@
 import { api } from './api';
 import type { AlertEvent, Appointment, Medication, VitalSign } from '../types';
 
+export interface Drug {
+  id: number;
+  uuid: string;
+  name: string;
+  dosages: string[];
+}
+
+export function getDrugCatalog(): Promise<Drug[]> {
+  return api.get<Drug[]>('/me/drugs');
+}
+
 export function getLatestVital(): Promise<VitalSign | null> {
   return api.get<VitalSign | null>('/me/vitals/latest');
 }
@@ -65,4 +76,38 @@ export function sendGpsPing(lat: number, lng: number): Promise<void> {
 
 export function setMyGeofence(lat: number, lng: number, safeRadiusM?: number): Promise<void> {
   return api.put('/me/geofence', { gps_lat: lat, gps_lng: lng, safe_radius_m: safeRadiusM });
+}
+
+export interface ProfileInput {
+  phone?: string;
+  cep?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  reference_point?: string;
+}
+
+export function updateMyProfile(data: ProfileInput): Promise<void> {
+  return api.put('/me/profile', data);
+}
+
+export function updateMyPassword(currentPassword: string, newPassword: string): Promise<void> {
+  return api.put('/me/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+    new_password_confirmation: newPassword,
+  });
+}
+
+export function uploadMyPhoto(uri: string): Promise<{ photo_url: string }> {
+  const formData = new FormData();
+  formData.append('photo', {
+    uri,
+    name: 'photo.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+  return api.upload<{ photo_url: string }>('/me/photo', formData);
 }
