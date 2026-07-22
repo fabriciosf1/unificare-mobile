@@ -139,7 +139,7 @@ export default function LoginScreen({ onLoggedIn }: { onLoggedIn: (role: AppRole
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={[styles.switchRoleLinkText, { color: theme.mid }]}>
-                  {role === 'patient' ? 'Sou família' : 'Sou paciente'}
+                  {role === 'patient' ? 'Sou familiar' : 'Sou cliente'}
                 </Text>
               </TouchableOpacity>
             </View>

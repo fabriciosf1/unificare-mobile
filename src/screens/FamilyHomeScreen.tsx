@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { familyLogout } from '../services/auth.service';
 import {
   approveAppointment,
@@ -24,6 +24,35 @@ import {
 } from '../services/family.service';
 import type { Appointment, FamilyContact, Medication, PendingApprovals } from '../types';
 import { colors, spacing, typography } from '../theme';
+
+function buildMapHtml(lat: number, lng: number, radius: number, name: string): string {
+  const safeName = name.replace(/</g, '&lt;').replace(/'/g, '&#39;');
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>html,body,#map{height:100%;margin:0;padding:0;}</style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([${lat}, ${lng}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    L.marker([${lat}, ${lng}]).addTo(map).bindPopup('${safeName}');
+    L.circle([${lat}, ${lng}], {
+      radius: ${radius},
+      color: '${colors.teal}',
+      fillColor: '${colors.teal}',
+      fillOpacity: 0.15
+    }).addTo(map);
+  </script>
+</body>
+</html>`;
+}
 
 export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [contact, setContact] = useState<FamilyContact | null>(null);
@@ -113,23 +142,11 @@ export default function FamilyHomeScreen({ onLoggedOut }: { onLoggedOut: () => v
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Localização</Text>
         {location ? (
-          <MapView
+          <WebView
             style={styles.map}
-            initialRegion={{
-              latitude: location.lat,
-              longitude: location.lng,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-            <Marker coordinate={{ latitude: location.lat, longitude: location.lng }} title={contact?.patient.name} />
-            <Circle
-              center={{ latitude: location.lat, longitude: location.lng }}
-              radius={safeRadius}
-              strokeColor={colors.teal}
-              fillColor="rgba(15,110,106,0.15)"
-            />
-          </MapView>
+            originWhitelist={['*']}
+            source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '') }}
+          />
         ) : (
           <Text style={styles.muted}>Ainda sem localização registrada.</Text>
         )}
