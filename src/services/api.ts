@@ -2,6 +2,9 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../config';
 
 const TOKEN_KEY = 'uc_patient_token';
+const ROLE_KEY = 'uc_app_role';
+
+export type AppRole = 'patient' | 'family';
 
 export async function getToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEY);
@@ -13,6 +16,15 @@ export async function setToken(token: string): Promise<void> {
 
 export async function clearToken(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await SecureStore.deleteItemAsync(ROLE_KEY);
+}
+
+export async function getRole(): Promise<AppRole | null> {
+  return (await SecureStore.getItemAsync(ROLE_KEY)) as AppRole | null;
+}
+
+export async function setRole(role: AppRole): Promise<void> {
+  await SecureStore.setItemAsync(ROLE_KEY, role);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -44,4 +56,6 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
 };

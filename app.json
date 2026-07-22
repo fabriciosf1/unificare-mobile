@@ -23,7 +23,26 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "O UnifCare usa sua localização para monitorar sua segurança e alertar sua família caso você saia da área segura, mesmo com o app em segundo plano.",
+          "locationAlwaysPermission": "O UnifCare usa sua localização em segundo plano para monitorar sua segurança.",
+          "locationWhenInUsePermission": "O UnifCare usa sua localização para monitorar sua segurança.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "O UnifCare usa a câmera para transmitir vídeo ao vivo para sua família quando você aciona o SOS.",
+          "microphonePermission": "O UnifCare usa o microfone para transmitir áudio ao vivo para sua família quando você aciona o SOS."
+        }
+      ]
     ]
   }
 }

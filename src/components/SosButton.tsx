@@ -3,16 +3,16 @@ import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } fr
 import { triggerSos } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
-export default function SosButton() {
+export default function SosButton({ onSosSuccess }: { onSosSuccess: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
 
   async function handleConfirm() {
     setSending(true);
     try {
       await triggerSos();
-      setSent(true);
+      setConfirming(false);
+      onSosSuccess();
     } finally {
       setSending(false);
     }
@@ -20,7 +20,6 @@ export default function SosButton() {
 
   function closeAll() {
     setConfirming(false);
-    setSent(false);
   }
 
   return (
@@ -32,39 +31,25 @@ export default function SosButton() {
       <Modal visible={confirming} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.card}>
-            {sent ? (
-              <>
-                <Text style={styles.title}>SOS enviado</Text>
-                <Text style={styles.message}>
-                  Sua equipe de cuidado foi notificada e já está a caminho.
-                </Text>
-                <TouchableOpacity style={styles.confirmButton} onPress={closeAll}>
-                  <Text style={styles.confirmText}>Fechar</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.title}>Confirmar emergência?</Text>
-                <Text style={styles.message}>
-                  Isso vai avisar imediatamente a equipe de cuidado. Toque em confirmar apenas se
-                  precisar de ajuda agora.
-                </Text>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleConfirm}
-                  disabled={sending}
-                >
-                  {sending ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.confirmText}>Sim, preciso de ajuda</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.cancelButton} onPress={closeAll} disabled={sending}>
-                  <Text style={styles.cancelText}>Cancelar</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            <Text style={styles.title}>Confirmar emergência?</Text>
+            <Text style={styles.message}>
+              Isso vai avisar imediatamente a equipe de cuidado e ligar sua câmera para transmitir
+              ao vivo para sua família. Toque em confirmar apenas se precisar de ajuda agora.
+            </Text>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleConfirm}
+              disabled={sending}
+            >
+              {sending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.confirmText}>Sim, preciso de ajuda</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeAll} disabled={sending}>
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

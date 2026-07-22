@@ -1,34 +1,92 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
-import { getToken } from './src/services/api';
-import { registerForPushNotifications } from './src/services/push.service';
+import * as Notifications from 'expo-notifications';
+import { getToken, getRole, AppRole } from './src/services/api';
+import { registerForPushNotifications, registerForFamilyPushNotifications } from './src/services/push.service';
+import { startBackgroundLocation } from './src/services/location.service';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AlertsHistoryScreen from './src/screens/AlertsHistoryScreen';
+import AddMedicationScreen from './src/screens/AddMedicationScreen';
+import AddAppointmentScreen from './src/screens/AddAppointmentScreen';
+import FamilyHomeScreen from './src/screens/FamilyHomeScreen';
+import SosCameraScreen from './src/screens/SosCameraScreen';
+import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
 
-type Screen = 'home' | 'history';
+type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'sosCamera';
+type FamilyScreen = 'home' | 'watchSos';
+
+interface SosCallData {
+  patientId: number;
+  patientName: string;
+}
 
 export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
-  const [screen, setScreen] = useState<Screen>('home');
+  const [role, setRole] = useState<AppRole | null>(null);
+  const [patientScreen, setPatientScreen] = useState<PatientScreen>('home');
+  const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('home');
+  const [sosCall, setSosCall] = useState<SosCallData | null>(null);
+  const roleRef = useRef<AppRole | null>(null);
 
   useEffect(() => {
-    getToken().then((token) => {
+    roleRef.current = role;
+  }, [role]);
+
+  useEffect(() => {
+    (async () => {
+      const token = await getToken();
+      const storedRole = await getRole();
       setLoggedIn(!!token);
+      setRole(storedRole);
       setCheckingSession(false);
-    });
+      if (token && storedRole === 'patient') {
+        startBackgroundLocation().catch(() => {});
+      }
+    })();
   }, []);
 
-  function handleLoggedIn() {
+  useEffect(() => {
+    function handleSosNotification(data: Record<string, unknown>) {
+      if (data?.type !== 'sos_call' || roleRef.current !== 'family') return;
+      const patientId = Number(data.patientId);
+      if (!patientId) return;
+      setSosCall({ patientId, patientName: String(data.patientName ?? 'Paciente') });
+      setFamilyScreen('watchSos');
+    }
+
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      handleSosNotification(notification.request.content.data as Record<string, unknown>);
+    });
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleSosNotification(response.notification.request.content.data as Record<string, unknown>);
+    });
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, []);
+
+  function handleLoggedIn(loggedInRole: AppRole) {
     setLoggedIn(true);
-    registerForPushNotifications().catch(() => {});
+    setRole(loggedInRole);
+    if (loggedInRole === 'patient') {
+      registerForPushNotifications().catch(() => {});
+      startBackgroundLocation().catch(() => {});
+    } else {
+      registerForFamilyPushNotifications().catch(() => {});
+    }
   }
 
   function handleLoggedOut() {
     setLoggedIn(false);
-    setScreen('home');
+    setRole(null);
+    setPatientScreen('home');
+    setFamilyScreen('home');
+    setSosCall(null);
   }
 
   if (checkingSession) {
@@ -43,11 +101,41 @@ export default function App() {
     <>
       <StatusBar barStyle="dark-content" />
       {!loggedIn && <LoginScreen onLoggedIn={handleLoggedIn} />}
-      {loggedIn && screen === 'home' && (
-        <HomeScreen onLoggedOut={handleLoggedOut} onOpenHistory={() => setScreen('history')} />
+
+      {loggedIn && role === 'family' && familyScreen === 'home' && (
+        <FamilyHomeScreen onLoggedOut={handleLoggedOut} />
       )}
-      {loggedIn && screen === 'history' && (
-        <AlertsHistoryScreen onBack={() => setScreen('home')} />
+      {loggedIn && role === 'family' && familyScreen === 'watchSos' && sosCall && (
+        <WatchSosScreen
+          patientId={sosCall.patientId}
+          patientName={sosCall.patientName}
+          onClose={() => setFamilyScreen('home')}
+        />
+      )}
+
+      {loggedIn && role === 'patient' && patientScreen === 'home' && (
+        <HomeScreen
+          onLoggedOut={handleLoggedOut}
+          onOpenHistory={() => setPatientScreen('history')}
+          onAddMedication={() => setPatientScreen('addMedication')}
+          onAddAppointment={() => setPatientScreen('addAppointment')}
+          onOpenSosCamera={(patientId) => {
+            setSosCall({ patientId, patientName: '' });
+            setPatientScreen('sosCamera');
+          }}
+        />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'history' && (
+        <AlertsHistoryScreen onBack={() => setPatientScreen('home')} />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'addMedication' && (
+        <AddMedicationScreen onBack={() => setPatientScreen('home')} onSaved={() => setPatientScreen('home')} />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'addAppointment' && (
+        <AddAppointmentScreen onBack={() => setPatientScreen('home')} onSaved={() => setPatientScreen('home')} />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'sosCamera' && sosCall && (
+        <SosCameraScreen patientId={sosCall.patientId} onClose={() => setPatientScreen('home')} />
       )}
     </>
   );

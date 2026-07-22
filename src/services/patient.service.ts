@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AlertEvent, Medication, VitalSign } from '../types';
+import type { AlertEvent, Appointment, Medication, VitalSign } from '../types';
 
 export function getLatestVital(): Promise<VitalSign | null> {
   return api.get<VitalSign | null>('/me/vitals/latest');
@@ -31,4 +31,38 @@ export function sendCheckIn(status: 'ok' | 'attention' | 'no_response', notes?: 
 
 export function registerPushToken(expoPushToken: string, platform: string): Promise<void> {
   return api.post('/me/push/subscribe', { expo_push_token: expoPushToken, platform });
+}
+
+export interface NewMedicationInput {
+  name: string;
+  dosage: string;
+  frequency: string;
+  schedule_times: string[];
+  start_date: string;
+  notes?: string;
+}
+
+export function requestMedication(data: NewMedicationInput): Promise<Medication> {
+  return api.post<Medication>('/me/medications', data);
+}
+
+export interface NewAppointmentInput {
+  appointment_date: string;
+  appointment_time: string;
+  type: 'consulta' | 'exame' | 'retorno' | 'outro';
+  professional?: string;
+  location?: string;
+  notes?: string;
+}
+
+export function requestAppointment(data: NewAppointmentInput): Promise<Appointment> {
+  return api.post<Appointment>('/me/appointments', data);
+}
+
+export function sendGpsPing(lat: number, lng: number): Promise<void> {
+  return api.post('/me/locations', { gps_lat: String(lat), gps_lng: String(lng) });
+}
+
+export function setMyGeofence(lat: number, lng: number, safeRadiusM?: number): Promise<void> {
+  return api.put('/me/geofence', { gps_lat: lat, gps_lng: lng, safe_radius_m: safeRadiusM });
 }

@@ -24,7 +24,7 @@ export default function AlertsHistoryScreen({ onBack }: { onBack: () => void }) 
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.teal} style={{ marginTop: spacing.xl }} />
+        <ActivityIndicator size="large" color={colors.green} style={{ marginTop: spacing.xl }} />
       ) : (
         <FlatList
           data={alerts}
@@ -51,13 +51,13 @@ export default function AlertsHistoryScreen({ onBack }: { onBack: () => void }) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+  container: { flex: 1, backgroundColor: colors.greenSurface },
   header: {
     paddingTop: spacing.xl,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
-  back: { fontSize: typography.label, color: colors.teal, fontWeight: '600', marginBottom: spacing.sm },
+  back: { fontSize: typography.label, color: colors.green, fontWeight: '600', marginBottom: spacing.sm },
   title: { fontSize: typography.title, fontWeight: '700', color: colors.text },
   muted: { fontSize: typography.label, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
   alertCard: {
