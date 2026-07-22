@@ -42,7 +42,8 @@
           "cameraPermission": "O UnifCare usa a câmera para transmitir vídeo ao vivo para sua família quando você aciona o SOS.",
           "microphonePermission": "O UnifCare usa o microfone para transmitir áudio ao vivo para sua família quando você aciona o SOS."
         }
-      ]
+      ],
+      "expo-status-bar"
     ]
   }
 }
