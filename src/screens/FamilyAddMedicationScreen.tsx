@@ -72,7 +72,7 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
 
   async function handleSubmit() {
     if (!selectedDrug || !dosage || !frequency || scheduleTimes.length === 0) {
-      Alert.alert('Selecione o remédio, a dosagem, a frequência e ao menos um horário.');
+      Alert.alert('Atenção', 'Selecione o remédio, a dosagem, a frequência e ao menos um horário.');
       return;
     }
 

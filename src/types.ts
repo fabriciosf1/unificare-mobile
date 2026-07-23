@@ -74,7 +74,10 @@ export interface PatientContact {
 export interface FamilyContact {
   uuid: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
   relationship: string | null;
+  password_must_change?: boolean;
   patient: {
     id: number; // uso interno (canal Reverb camera.{id}) — não usar em URLs
     uuid: string;

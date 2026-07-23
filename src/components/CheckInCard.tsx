@@ -23,7 +23,7 @@ export default function CheckInCard() {
       await sendCheckIn(status);
       setSentStatus(status);
     } catch {
-      Alert.alert('Não foi possível enviar o check-in agora.');
+      Alert.alert('Erro', 'Não foi possível enviar o check-in agora.');
     }
   }
 
@@ -34,7 +34,7 @@ export default function CheckInCard() {
       setSentStatus('attention');
       setAskingWhat(false);
     } catch {
-      Alert.alert('Não foi possível enviar o check-in agora.');
+      Alert.alert('Erro', 'Não foi possível enviar o check-in agora.');
     } finally {
       setSending(false);
     }

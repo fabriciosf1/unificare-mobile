@@ -82,7 +82,7 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
 
   async function handleSubmit() {
     if (!examType || !file) {
-      Alert.alert('Selecione o tipo de documento e anexe um arquivo.');
+      Alert.alert('Atenção', 'Selecione o tipo de documento e anexe um arquivo.');
       return;
     }
 

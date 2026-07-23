@@ -6,6 +6,24 @@ export function familyMe(): Promise<FamilyContact> {
   return api.get<FamilyContact>('/family/me');
 }
 
+export function familyUpdatePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return api.put('/family/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+    new_password_confirmation: newPassword,
+  });
+}
+
+export interface FamilyProfileInput {
+  name: string;
+  phone?: string;
+  email?: string;
+}
+
+export function familyUpdateProfile(data: FamilyProfileInput): Promise<void> {
+  return api.put('/family/profile', data);
+}
+
 export function getPendingApprovals(): Promise<PendingApprovals> {
   return api.get<PendingApprovals>('/family/pending');
 }

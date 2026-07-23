@@ -137,6 +137,7 @@ export default function HomeScreen({
 
   return (
     <View style={styles.screen}>
+      <View style={styles.statusBarSpacer} />
       <View style={styles.headerBar}>
         <TouchableOpacity style={styles.headerProfile} onPress={onOpenProfile} activeOpacity={0.8}>
           {patient?.photo_url ? (
@@ -318,12 +319,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.greenSurface },
+  statusBarSpacer: {
+    height: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54,
+    backgroundColor: colors.greenDarker,
+  },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.greenDark,
-    paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomLeftRadius: 20,

@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import notifee, { EventType } from 'react-native-notify-kit';
 import { getToken, getRole, AppRole } from './src/services/api';
 import { me as getPatientMe } from './src/services/auth.service';
+import { familyMe } from './src/services/family.service';
 import { registerForPushNotifications, registerForFamilyPushNotifications } from './src/services/push.service';
 import { startBackgroundLocation } from './src/services/location.service';
 import {
@@ -13,6 +14,7 @@ import {
   openAlarmPermissionSettings,
 } from './src/services/alarm.service';
 import LoginScreen from './src/screens/LoginScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AlertsHistoryScreen from './src/screens/AlertsHistoryScreen';
@@ -23,6 +25,7 @@ import ExamsScreen from './src/screens/ExamsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FamiliaresScreen from './src/screens/FamiliaresScreen';
 import FamilyHomeScreen from './src/screens/FamilyHomeScreen';
+import FamilyProfileScreen from './src/screens/FamilyProfileScreen';
 import FamilyAlertsScreen from './src/screens/FamilyAlertsScreen';
 import FamilyMedicationsScreen from './src/screens/FamilyMedicationsScreen';
 import FamilyAddExamScreen from './src/screens/FamilyAddExamScreen';
@@ -34,7 +37,8 @@ import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
 
 type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'sosCamera' | 'profile' | 'familiares';
-type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'addMedication' | 'addAppointment';
+type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'addMedication' | 'addAppointment' | 'profile';
+type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
   patientId: number;
@@ -59,6 +63,7 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('login');
   const [patientScreen, setPatientScreen] = useState<PatientScreen>('home');
   const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('home');
   const [sosCall, setSosCall] = useState<SosCallData | null>(null);
@@ -91,6 +96,17 @@ export default function App() {
           }
           startBackgroundLocation().catch(() => {});
           setupMedicationAlarms().catch(() => {});
+        } else if (storedRole === 'family') {
+          try {
+            const contact = await familyMe();
+            if (contact.password_must_change) {
+              setMustChangePassword(true);
+              setCheckingSession(false);
+              return;
+            }
+          } catch {
+            // idem — segue o fluxo normal se a checagem falhar
+          }
         }
         setCheckingSession(false);
         return;
@@ -147,11 +163,12 @@ export default function App() {
   function handleLoggedIn(loggedInRole: AppRole, mustChange?: boolean) {
     setLoggedIn(true);
     setRole(loggedInRole);
+    setAuthScreen('login');
+    if (mustChange) {
+      setMustChangePassword(true);
+      return;
+    }
     if (loggedInRole === 'patient') {
-      if (mustChange) {
-        setMustChangePassword(true);
-        return;
-      }
       registerForPushNotifications().catch(() => {});
       startBackgroundLocation().catch(() => {});
       setupMedicationAlarms().catch(() => {});
@@ -162,14 +179,19 @@ export default function App() {
 
   function handlePasswordChanged() {
     setMustChangePassword(false);
-    registerForPushNotifications().catch(() => {});
-    startBackgroundLocation().catch(() => {});
-    setupMedicationAlarms().catch(() => {});
+    if (role === 'patient') {
+      registerForPushNotifications().catch(() => {});
+      startBackgroundLocation().catch(() => {});
+      setupMedicationAlarms().catch(() => {});
+    } else if (role === 'family') {
+      registerForFamilyPushNotifications().catch(() => {});
+    }
   }
 
   function handleLoggedOut() {
     setLoggedIn(false);
     setRole(null);
+    setAuthScreen('login');
     setPatientScreen('home');
     setFamilyScreen('home');
     setSosCall(null);
@@ -184,12 +206,24 @@ export default function App() {
     );
   }
 
+  const statusBarBackground = role === 'patient' ? colors.greenDarker : role === 'family' ? colors.blueDarker : undefined;
+  const statusBarStyle = role ? 'light-content' : 'dark-content';
+
   return (
     <>
-      <StatusBar barStyle="dark-content" />
-      {!loggedIn && <LoginScreen onLoggedIn={handleLoggedIn} />}
+      <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBackground} />
+      {!loggedIn && authScreen === 'login' && (
+        <LoginScreen onLoggedIn={handleLoggedIn} onForgotPassword={() => setAuthScreen('forgotPassword')} />
+      )}
+      {!loggedIn && authScreen === 'forgotPassword' && (
+        <ForgotPasswordScreen onBack={() => setAuthScreen('login')} />
+      )}
 
-      {loggedIn && role === 'family' && familyScreen === 'home' && (
+      {loggedIn && mustChangePassword && (role === 'patient' || role === 'family') && (
+        <ChangePasswordScreen role={role} onChanged={handlePasswordChanged} />
+      )}
+
+      {loggedIn && role === 'family' && familyScreen === 'home' && !mustChangePassword && (
         <FamilyHomeScreen
           onLoggedOut={handleLoggedOut}
           onOpenAlerts={() => setFamilyScreen('alerts')}
@@ -200,7 +234,11 @@ export default function App() {
           }}
           onOpenAddExam={() => setFamilyScreen('exams')}
           onOpenAddAppointment={() => setFamilyScreen('addAppointment')}
+          onOpenProfile={() => setFamilyScreen('profile')}
         />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'profile' && (
+        <FamilyProfileScreen onBack={() => setFamilyScreen('home')} />
       )}
       {loggedIn && role === 'family' && familyScreen === 'alerts' && (
         <FamilyAlertsScreen onBack={() => setFamilyScreen('home')} />
@@ -226,10 +264,6 @@ export default function App() {
           patientName={sosCall.patientName}
           onClose={() => setFamilyScreen('home')}
         />
-      )}
-
-      {loggedIn && role === 'patient' && mustChangePassword && (
-        <ChangePasswordScreen onChanged={handlePasswordChanged} />
       )}
 
       {loggedIn && role === 'patient' && !mustChangePassword && patientScreen === 'home' && (

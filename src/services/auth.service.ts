@@ -31,6 +31,10 @@ export async function familyLogin(login_: string, password: string): Promise<Fam
   return contact;
 }
 
+export function familyForgotPassword(email: string): Promise<{ message: string }> {
+  return api.post('/family-auth/forgot-password', { email });
+}
+
 export async function logout(): Promise<void> {
   try {
     await api.post('/me/logout');

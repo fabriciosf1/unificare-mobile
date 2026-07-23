@@ -130,11 +130,11 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
 
   async function handleSavePassword() {
     if (!currentPassword || !newPassword || newPassword.length < 8) {
-      Alert.alert('Informe a senha atual e uma nova senha com ao menos 8 caracteres.');
+      Alert.alert('Atenção', 'Informe a senha atual e uma nova senha com ao menos 8 caracteres.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('A confirmação de senha não confere.');
+      Alert.alert('Atenção', 'A confirmação de senha não confere.');
       return;
     }
 

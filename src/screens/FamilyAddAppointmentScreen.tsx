@@ -49,7 +49,7 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
 
   async function handleSubmit() {
     if (!date || !time) {
-      Alert.alert('Selecione a data e o horário da consulta.');
+      Alert.alert('Atenção', 'Selecione a data e o horário da consulta.');
       return;
     }
 

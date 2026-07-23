@@ -33,8 +33,10 @@ function formatCpf(digits: string) {
 
 export default function LoginScreen({
   onLoggedIn,
+  onForgotPassword,
 }: {
   onLoggedIn: (role: AppRole, mustChangePassword?: boolean) => void;
+  onForgotPassword: () => void;
 }) {
   const [role, setRoleValue] = useState<AppRole>('patient');
   const [loginValue, setLoginValue] = useState('');
@@ -71,8 +73,8 @@ export default function LoginScreen({
         const patient = await login(loginValue, password);
         onLoggedIn(role, patient.password_must_change);
       } else {
-        await familyLogin(loginValue, password);
-        onLoggedIn(role);
+        const contact = await familyLogin(loginValue, password);
+        onLoggedIn(role, contact.password_must_change);
       }
     } catch (err) {
       setAlertInfo({ title: 'Não foi possível entrar', message: 'Verifique seus dados e tente novamente.' });
@@ -161,6 +163,18 @@ export default function LoginScreen({
                   {role === 'patient' ? 'Sou familiar' : 'Sou cliente'}
                 </Text>
               </TouchableOpacity>
+
+              {role === 'family' && (
+                <TouchableOpacity
+                  style={styles.switchRoleLink}
+                  onPress={onForgotPassword}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={[styles.switchRoleLinkText, { color: colors.muted, textDecorationLine: 'underline' }]}>
+                    Esqueci minha senha
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </Animated.View>
 

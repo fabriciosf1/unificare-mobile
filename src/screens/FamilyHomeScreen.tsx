@@ -99,6 +99,7 @@ export default function FamilyHomeScreen({
   onOpenCamera,
   onOpenAddExam,
   onOpenAddAppointment,
+  onOpenProfile,
 }: {
   onLoggedOut: () => void;
   onOpenAlerts: () => void;
@@ -106,6 +107,7 @@ export default function FamilyHomeScreen({
   onOpenCamera: (patientId: number, patientName: string) => void;
   onOpenAddExam: () => void;
   onOpenAddAppointment: () => void;
+  onOpenProfile: () => void;
 }) {
   const [contact, setContact] = useState<FamilyContact | null>(null);
   const [pending, setPending] = useState<PendingApprovals>({ medications: [], appointments: [] });
@@ -198,16 +200,22 @@ export default function FamilyHomeScreen({
 
   return (
     <View style={styles.screen}>
+      <View style={styles.statusBarSpacer} />
       <View style={styles.headerBar}>
-        <View style={styles.headerLeft}>
+        <TouchableOpacity style={styles.headerLeft} onPress={onOpenProfile} activeOpacity={0.75} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <View style={styles.headerLogoWrap}>
             <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
           </View>
-          <Text style={styles.greeting}>{contact?.patient.name}</Text>
-        </View>
-        <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Text style={styles.logout}>Sair</Text>
+          <View style={styles.headerNames}>
+            <Text style={styles.greeting}>{contact?.name}</Text>
+            <Text style={styles.headerPatientName}>{contact?.patient.name}</Text>
+          </View>
         </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={styles.logout}>Sair</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
     <ScrollView
@@ -344,12 +352,16 @@ const styles = StyleSheet.create({
   },
   footerIcon: { fontSize: 22 },
   footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
+  statusBarSpacer: {
+    height: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54,
+    backgroundColor: colors.blueDarker,
+  },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.blueDark,
-    paddingTop: (Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54) + spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomLeftRadius: 20,
@@ -365,7 +377,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerLogo: { width: 22, height: 22 },
+  headerNames: { flexShrink: 1 },
   greeting: { fontSize: typography.subtitle, fontWeight: '700', color: '#fff', flexShrink: 1 },
+  headerPatientName: { fontSize: 13, color: '#fff', opacity: 0.85, marginTop: 1, flexShrink: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   logout: { fontSize: typography.label, color: '#fff', fontWeight: '700', opacity: 0.9 },
   card: {
     backgroundColor: colors.card,
