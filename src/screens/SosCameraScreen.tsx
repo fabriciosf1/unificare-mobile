@@ -16,7 +16,7 @@ import { cameraService } from '../services/camera.service';
 import { subscribeCameraChannel, unsubscribeCameraChannel } from '../services/realtime';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
-type ConnState = 'starting' | 'camera_on' | 'waiting_offer' | 'connected' | 'failed';
+type ConnState = 'starting' | 'camera_on' | 'waiting_offer' | 'connected' | 'failed' | 'ended_by_family';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -29,6 +29,9 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
   const pusherRef = useRef<Pusher | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const cleanup = useCallback(() => {
     pcRef.current?.close();
@@ -130,15 +133,31 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
           await pcRef.current?.addIceCandidate(new RTCIceCandidate(e.candidate));
         } catch {}
       });
+
+      // Família encerrou a chamada do lado dela — sem isso o ICE simplesmente cai e a tela
+      // mostra "Falha ao transmitir", dando a entender problema técnico em vez de a família ter desligado.
+      channel.bind('camera.hangup', (e: { from: string }) => {
+        if (e.from !== 'family') return;
+        if (cancelled) return;
+        setConnState('ended_by_family');
+        // Encerra a chamada deste lado também — sem isso a tela ficava presa mostrando
+        // "falha" e o idoso precisava descobrir sozinho que precisava fechar manualmente.
+        pcRef.current?.close();
+        pcRef.current = null;
+        autoCloseTimerRef.current = setTimeout(() => onCloseRef.current(), 2500);
+      });
     })();
 
     return () => {
       cancelled = true;
+      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
       cleanup();
     };
   }, [patientId, cleanup]);
 
   function handleClose() {
+    // Best-effort: avisa a família que foi o paciente quem encerrou, não uma falha de rede.
+    if (connState !== 'ended_by_family') cameraService.sendMyHangup().catch(() => {});
     cleanup();
     onClose();
   }
@@ -167,6 +186,7 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
             {connState === 'waiting_offer' && 'Conectando com sua família...'}
             {connState === 'connected' && 'Ao vivo — sua família está vendo'}
             {connState === 'failed' && 'Falha ao transmitir'}
+            {connState === 'ended_by_family' && 'Sua família encerrou a chamada'}
           </Text>
         </View>
 

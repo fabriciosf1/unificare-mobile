@@ -17,7 +17,7 @@ import { subscribeCameraChannel, unsubscribeCameraChannel } from '../services/re
 import { respondToAlert } from '../services/family.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
-type ConnState = 'requesting' | 'waiting' | 'connected' | 'failed';
+type ConnState = 'requesting' | 'waiting' | 'connected' | 'failed' | 'ended_by_patient';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -131,6 +131,18 @@ export default function WatchSosScreen({
         } catch {}
       });
 
+      // Paciente encerrou a chamada do lado dele — sem isso o ICE simplesmente cai e a tela
+      // mostra "Conexão perdida ou recusada", dando a entender falha técnica em vez de ação do idoso.
+      channel.bind('camera.hangup', (e: { from: string }) => {
+        if (e.from !== 'patient') return;
+        answered = true;
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
+        if (!cancelled) setConnState('ended_by_patient');
+      });
+
       const gatheredCandidates: RTCIceCandidate[] = [];
       let sid: string | null = null;
 
@@ -187,6 +199,8 @@ export default function WatchSosScreen({
   }, [patientId, cleanup]);
 
   function handleClose() {
+    // Best-effort: avisa o paciente que foi a família quem encerrou, não uma falha de rede.
+    if (connState !== 'ended_by_patient') cameraService.sendFamilyHangup().catch(() => {});
     cleanup();
     onClose();
   }
@@ -196,6 +210,7 @@ export default function WatchSosScreen({
   async function handleRespond(response: 'ok' | 'help') {
     if (!alertUuid || responding) return;
     setResponding(true);
+    if (connState !== 'ended_by_patient') cameraService.sendFamilyHangup().catch(() => {});
     try {
       await respondToAlert(alertUuid, response);
     } catch {
@@ -217,6 +232,7 @@ export default function WatchSosScreen({
             {connState === 'requesting' && 'Conectando...'}
             {connState === 'waiting' && `Aguardando o vídeo de ${patientName}...`}
             {connState === 'failed' && 'Conexão perdida ou recusada.'}
+            {connState === 'ended_by_patient' && `${patientName} encerrou a chamada.`}
           </Text>
         </View>
       )}

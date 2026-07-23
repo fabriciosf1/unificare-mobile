@@ -63,6 +63,8 @@ interface LatestLocationResponse {
     pending_safe_radius_m?: number | null;
     geofence_approval_status?: string | null;
   } | null;
+  address: string | null;
+  since: string | null;
 }
 
 export function getLatestLocation(): Promise<LatestLocationResponse> {

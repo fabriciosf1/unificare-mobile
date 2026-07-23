@@ -4,10 +4,7 @@ import {
   Alert,
   Dimensions,
   Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -93,6 +90,12 @@ function buildMapHtml(lat: number, lng: number, radius: number, name: string, ph
 </html>`;
 }
 
+function formatSince(iso: string | null): string | null {
+  if (!iso) return null;
+  const time = new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `Desde às ${time}`;
+}
+
 export default function FamilyHomeScreen({
   onLoggedOut,
   onOpenAlerts,
@@ -113,10 +116,13 @@ export default function FamilyHomeScreen({
   const [contact, setContact] = useState<FamilyContact | null>(null);
   const [pending, setPending] = useState<PendingApprovals>({ medications: [], appointments: [] });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [since, setSince] = useState<string | null>(null);
   const [safeRadius, setSafeRadius] = useState(500);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requestingCamera, setRequestingCamera] = useState(false);
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
   const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
@@ -129,6 +135,8 @@ export default function FamilyHomeScreen({
     if (loc.threshold?.safe_radius_m) {
       setSafeRadius(loc.threshold.safe_radius_m);
     }
+    setAddress(loc.address);
+    setSince(loc.since);
   }, []);
 
   useEffect(() => {
@@ -199,11 +207,23 @@ export default function FamilyHomeScreen({
   }
 
   const hasPending = pending.medications.length > 0 || pending.appointments.length > 0 || !!pending.geofence;
+  const pendingCount = pending.medications.length + pending.appointments.length + (pending.geofence ? 1 : 0);
 
   return (
     <View style={styles.screen}>
-      <View style={styles.statusBarSpacer} />
-      <View style={styles.headerBar}>
+      {location ? (
+        <WebView
+          style={styles.map}
+          originWhitelist={['*']}
+          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', contact?.patient.photo_url ?? null) }}
+        />
+      ) : (
+        <View style={[styles.map, styles.noLocation]}>
+          <Text style={styles.muted}>Ainda sem localização registrada.</Text>
+        </View>
+      )}
+
+      <View style={[styles.headerBar, { paddingTop: Math.max(insets.top, spacing.sm) }]}>
         <TouchableOpacity style={styles.headerLeft} onPress={onOpenProfile} activeOpacity={0.75} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <View style={styles.headerLogoWrap}>
             <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
@@ -214,88 +234,44 @@ export default function FamilyHomeScreen({
           </View>
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleRefresh} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} disabled={refreshing}>
+            {refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.refreshIcon}>↻</Text>}
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Text style={styles.logout}>Sair</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <Text style={styles.mapSectionTitle}>Localização</Text>
-      {location ? (
-        <WebView
-          style={styles.map}
-          originWhitelist={['*']}
-          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', contact?.patient.photo_url ?? null) }}
-        />
-      ) : (
-        <View style={styles.card}>
-          <Text style={styles.muted}>Ainda sem localização registrada.</Text>
-        </View>
+      {hasPending && (
+        <TouchableOpacity
+          style={[styles.pendingBadge, { top: Math.max(insets.top, spacing.sm) + 64 }]}
+          onPress={() => setPendingModalOpen(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.pendingBadgeIcon}>🔔</Text>
+          <View style={styles.pendingBadgeCount}>
+            <Text style={styles.pendingBadgeCountText}>{pendingCount}</Text>
+          </View>
+        </TouchableOpacity>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Pendências para aprovar</Text>
-        {!hasPending && <Text style={styles.muted}>Nenhuma pendência no momento.</Text>}
-
-        {pending.geofence && (
-          <View style={styles.pendingRow}>
-            <Text style={styles.pendingTitle}>📍 Nova localização de "minha casa"</Text>
-            <Text style={styles.pendingDetail}>
-              {contact?.patient.name} solicitou definir a localização atual como área segura
-              {pending.geofence.pending_safe_radius_m ? ` (raio de ${pending.geofence.pending_safe_radius_m} m)` : ''}.
-            </Text>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.rejectButton} onPress={() => handleGeofence(false)}>
-                <Text style={styles.rejectButtonText}>Rejeitar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.approveButton} onPress={() => handleGeofence(true)}>
-                <Text style={styles.approveButtonText}>Aprovar</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={[styles.statusCard, { bottom: insets.bottom + 96 }]}>
+        {contact?.patient.photo_url ? (
+          <Image source={{ uri: contact.patient.photo_url }} style={styles.statusPhoto} />
+        ) : (
+          <View style={[styles.statusPhoto, styles.statusPhotoPlaceholder]}>
+            <Text style={styles.statusPhotoInitial}>{contact?.patient.name?.[0] ?? '?'}</Text>
           </View>
         )}
-
-        {pending.medications.map((med) => (
-          <View key={med.uuid} style={styles.pendingRow}>
-            <Text style={styles.pendingTitle}>💊 {med.name}</Text>
-            <Text style={styles.pendingDetail}>
-              {med.dosage} • {med.schedule_times.join(', ')}
-            </Text>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.rejectButton} onPress={() => handleMedication(med, false)}>
-                <Text style={styles.rejectButtonText}>Rejeitar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.approveButton} onPress={() => handleMedication(med, true)}>
-                <Text style={styles.approveButtonText}>Aprovar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-
-        {pending.appointments.map((appt) => (
-          <View key={appt.uuid} style={styles.pendingRow}>
-            <Text style={styles.pendingTitle}>🗓️ {appt.type}</Text>
-            <Text style={styles.pendingDetail}>
-              {appt.appointment_date} às {appt.appointment_time}
-              {appt.professional ? ` • ${appt.professional}` : ''}
-            </Text>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.rejectButton} onPress={() => handleAppointment(appt, false)}>
-                <Text style={styles.rejectButtonText}>Rejeitar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.approveButton} onPress={() => handleAppointment(appt, true)}>
-                <Text style={styles.approveButtonText}>Aprovar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+        <View style={styles.statusInfo}>
+          <Text style={styles.statusName}>{contact?.patient.name}</Text>
+          <Text style={styles.statusAddress} numberOfLines={1}>
+            {address ?? (location ? 'Localização não identificada' : 'Sem localização')}
+          </Text>
+          {since && <Text style={styles.statusSince}>{formatSince(since)}</Text>}
+        </View>
       </View>
-    </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TouchableOpacity style={styles.footerItem} onPress={onOpenAlerts} activeOpacity={0.75}>
@@ -325,45 +301,99 @@ export default function FamilyHomeScreen({
           <Text style={styles.footerLabel}>Consulta</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={pendingModalOpen} animationType="slide" transparent onRequestClose={() => setPendingModalOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.cardTitle}>Pendências para aprovar</Text>
+
+            {pending.geofence && (
+              <View style={styles.pendingRow}>
+                <Text style={styles.pendingTitle}>📍 Nova localização de "minha casa"</Text>
+                <Text style={styles.pendingDetail}>
+                  {contact?.patient.name} solicitou definir a localização atual como área segura
+                  {pending.geofence.pending_safe_radius_m ? ` (raio de ${pending.geofence.pending_safe_radius_m} m)` : ''}.
+                </Text>
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleGeofence(false)}>
+                    <Text style={styles.rejectButtonText}>Rejeitar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.approveButton} onPress={() => handleGeofence(true)}>
+                    <Text style={styles.approveButtonText}>Aprovar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {pending.medications.map((med) => (
+              <View key={med.uuid} style={styles.pendingRow}>
+                <Text style={styles.pendingTitle}>💊 {med.name}</Text>
+                <Text style={styles.pendingDetail}>
+                  {med.dosage} • {med.schedule_times.join(', ')}
+                </Text>
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleMedication(med, false)}>
+                    <Text style={styles.rejectButtonText}>Rejeitar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.approveButton} onPress={() => handleMedication(med, true)}>
+                    <Text style={styles.approveButtonText}>Aprovar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            {pending.appointments.map((appt) => (
+              <View key={appt.uuid} style={styles.pendingRow}>
+                <Text style={styles.pendingTitle}>🗓️ {appt.type}</Text>
+                <Text style={styles.pendingDetail}>
+                  {appt.appointment_date} às {appt.appointment_time}
+                  {appt.professional ? ` • ${appt.professional}` : ''}
+                </Text>
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleAppointment(appt, false)}>
+                    <Text style={styles.rejectButtonText}>Rejeitar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.approveButton} onPress={() => handleAppointment(appt, true)}>
+                    <Text style={styles.approveButtonText}>Aprovar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setPendingModalOpen(false)}>
+              <Text style={styles.modalCloseButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.blueSurface },
-  container: { flex: 1 },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blueSurface },
-  footer: {
-    flexDirection: 'row',
-    backgroundColor: colors.blueDark,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingBottom: (Platform.OS === 'ios' ? spacing.lg : spacing.sm),
-    gap: spacing.sm,
+  map: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
   },
-  footerItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  footerIcon: { fontSize: 22 },
-  footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
-  statusBarSpacer: {
-    height: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 54,
-    backgroundColor: colors.blueDarker,
-  },
+  noLocation: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blueSurface },
+  muted: { fontSize: typography.label, color: colors.muted },
   headerBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.blueDark,
-    paddingTop: spacing.md,
+    backgroundColor: 'rgba(11,41,71,0.85)',
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomLeftRadius: 20,
@@ -383,30 +413,100 @@ const styles = StyleSheet.create({
   greeting: { fontSize: typography.subtitle, fontWeight: '700', color: '#fff', flexShrink: 1 },
   headerPatientName: { fontSize: 13, color: '#fff', opacity: 0.85, marginTop: 1, flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  refreshIcon: { fontSize: 22, color: '#fff', fontWeight: '700' },
   logout: { fontSize: typography.label, color: '#fff', fontWeight: '700', opacity: 0.9 },
-  card: {
+  pendingBadge: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  pendingBadgeIcon: { fontSize: 22 },
+  pendingBadgeCount: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  pendingBadgeCountText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  statusCard: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.card,
     borderRadius: 16,
-    borderColor: colors.border,
-    borderWidth: 1,
     padding: spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  statusPhoto: { width: 56, height: 56, borderRadius: 28 },
+  statusPhotoPlaceholder: { backgroundColor: colors.blueDim, alignItems: 'center', justifyContent: 'center' },
+  statusPhotoInitial: { fontSize: 22, fontWeight: '700', color: colors.blueDark },
+  statusInfo: { flex: 1 },
+  statusName: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text },
+  statusAddress: { fontSize: 14, color: colors.muted, marginTop: 2 },
+  statusSince: { fontSize: 13, color: colors.hint, marginTop: 2, fontWeight: '600' },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(11,41,71,0.85)',
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+  },
+  footerItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  footerIcon: { fontSize: 22 },
+  footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    maxHeight: '80%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
     marginBottom: spacing.md,
   },
   cardTitle: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
-  muted: { fontSize: typography.label, color: colors.muted },
-  mapSectionTitle: {
-    fontSize: typography.subtitle,
-    fontWeight: '700',
-    color: colors.text,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  map: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.5,
-    marginHorizontal: -spacing.lg,
-    marginBottom: spacing.md,
-  },
   pendingRow: {
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
@@ -433,4 +533,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectButtonText: { color: colors.red, fontWeight: '700' },
+  modalCloseButton: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  modalCloseButtonText: { color: colors.muted, fontWeight: '700' },
 });
