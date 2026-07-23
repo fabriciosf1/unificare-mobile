@@ -27,20 +27,37 @@ async function getExpoPushToken(): Promise<string | null> {
     return null;
   }
 
-  const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
-  return expoPushToken;
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  if (!projectId) {
+    console.warn('[push] extra.eas.projectId ausente no app.json — token de push não pode ser gerado.');
+    return null;
+  }
+
+  try {
+    const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({ projectId });
+    return expoPushToken;
+  } catch (error) {
+    console.warn('[push] Falha ao obter o token de push Expo:', error);
+    return null;
+  }
 }
 
 export async function registerForPushNotifications(): Promise<void> {
   const token = await getExpoPushToken();
-  if (token) {
+  if (!token) return;
+  try {
     await registerPushToken(token, Platform.OS);
+  } catch (error) {
+    console.warn('[push] Falha ao registrar token de push (paciente) no servidor:', error);
   }
 }
 
 export async function registerForFamilyPushNotifications(): Promise<void> {
   const token = await getExpoPushToken();
-  if (token) {
+  if (!token) return;
+  try {
     await registerFamilyPushToken(token, Platform.OS);
+  } catch (error) {
+    console.warn('[push] Falha ao registrar token de push (família) no servidor:', error);
   }
 }

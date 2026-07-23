@@ -46,6 +46,7 @@ export interface Medication {
   today_adherence: 'taken' | 'pending' | 'missed' | 'late';
   today_doses: MedicationDose[];
   approval_status?: 'approved' | 'pending' | 'rejected';
+  notes?: string | null;
 }
 
 export interface Appointment {

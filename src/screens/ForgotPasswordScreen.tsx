@@ -36,7 +36,7 @@ export default function ForgotPasswordScreen({ onBack }: { onBack: () => void })
 
   return (
     <LinearGradient colors={[colors.blueDark, colors.blue, colors.blueLight]} style={styles.gradient}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.brandBlock}>
             <View style={styles.logoWrap}>

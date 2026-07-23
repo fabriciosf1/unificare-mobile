@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import notifee, { EventType } from 'react-native-notify-kit';
@@ -36,9 +36,10 @@ import FamilyAddAppointmentScreen from './src/screens/FamilyAddAppointmentScreen
 import SosCameraScreen from './src/screens/SosCameraScreen';
 import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
+import type { Medication } from './src/types';
 
 type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'sosCamera' | 'profile' | 'familiares';
-type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'addMedication' | 'addAppointment' | 'profile';
+type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
@@ -68,6 +69,7 @@ export default function App() {
   const [patientScreen, setPatientScreen] = useState<PatientScreen>('home');
   const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('home');
   const [sosCall, setSosCall] = useState<SosCallData | null>(null);
+  const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const roleRef = useRef<AppRole | null>(null);
 
@@ -193,6 +195,67 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!loggedIn) {
+        if (authScreen === 'forgotPassword') {
+          setAuthScreen('login');
+          return true;
+        }
+        return false;
+      }
+
+      if (mustChangePassword) {
+        return true;
+      }
+
+      if (role === 'family') {
+        switch (familyScreen) {
+          case 'home':
+            return false;
+          case 'editMedication':
+            setEditingMedication(null);
+            setFamilyScreen('medications');
+            return true;
+          case 'addMedication':
+            setFamilyScreen('medications');
+            return true;
+          case 'addExam':
+            setFamilyScreen('exams');
+            return true;
+          case 'watchSos':
+            setSosCall(null);
+            setFamilyScreen('home');
+            return true;
+          default:
+            setFamilyScreen('home');
+            return true;
+        }
+      }
+
+      if (role === 'patient') {
+        switch (patientScreen) {
+          case 'home':
+            return false;
+          case 'addExam':
+            setPatientScreen('exams');
+            return true;
+          case 'sosCamera':
+            setSosCall(null);
+            setPatientScreen('home');
+            return true;
+          default:
+            setPatientScreen('home');
+            return true;
+        }
+      }
+
+      return false;
+    });
+
+    return () => sub.remove();
+  }, [loggedIn, authScreen, mustChangePassword, role, familyScreen, patientScreen]);
+
   function handleLoggedOut() {
     setLoggedIn(false);
     setRole(null);
@@ -251,10 +314,27 @@ export default function App() {
         <FamilyAlertsScreen onBack={() => setFamilyScreen('home')} />
       )}
       {loggedIn && role === 'family' && familyScreen === 'medications' && (
-        <FamilyMedicationsScreen onBack={() => setFamilyScreen('home')} onAddMedication={() => setFamilyScreen('addMedication')} />
+        <FamilyMedicationsScreen
+          onBack={() => setFamilyScreen('home')}
+          onAddMedication={() => setFamilyScreen('addMedication')}
+          onEditMedication={(medication) => {
+            setEditingMedication(medication);
+            setFamilyScreen('editMedication');
+          }}
+        />
       )}
       {loggedIn && role === 'family' && familyScreen === 'addMedication' && (
         <FamilyAddMedicationScreen onBack={() => setFamilyScreen('medications')} onSaved={() => setFamilyScreen('medications')} />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'editMedication' && editingMedication && (
+        <FamilyAddMedicationScreen
+          medication={editingMedication}
+          onBack={() => setFamilyScreen('medications')}
+          onSaved={() => {
+            setEditingMedication(null);
+            setFamilyScreen('medications');
+          }}
+        />
       )}
       {loggedIn && role === 'family' && familyScreen === 'addAppointment' && (
         <FamilyAddAppointmentScreen onBack={() => setFamilyScreen('home')} onSaved={() => setFamilyScreen('home')} />

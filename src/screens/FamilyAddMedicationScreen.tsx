@@ -16,32 +16,34 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getFamilyDrugCatalog, createFamilyMedication } from '../services/family.service';
+import { getFamilyDrugCatalog, createFamilyMedication, updateFamilyMedication } from '../services/family.service';
 import type { Drug } from '../services/patient.service';
+import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
-
-const FREQUENCIES = [
-  '1x ao dia',
-  '2x ao dia (a cada 12h)',
-  '3x ao dia (a cada 8h)',
-  '4x ao dia (a cada 6h)',
-  'A cada 4h',
-  'Se necessário',
-];
+import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
 }
 
-export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
+export default function FamilyAddMedicationScreen({
+  onBack,
+  onSaved,
+  medication,
+}: {
+  onBack: () => void;
+  onSaved: () => void;
+  medication?: Medication;
+}) {
+  const isEdit = !!medication;
   const [drugs, setDrugs] = useState<Drug[]>([]);
-  const [loadingDrugs, setLoadingDrugs] = useState(true);
+  const [loadingDrugs, setLoadingDrugs] = useState(!isEdit);
 
   const [selectedDrug, setSelectedDrug] = useState<Drug | null>(null);
-  const [dosage, setDosage] = useState('');
-  const [frequency, setFrequency] = useState('');
-  const [scheduleTimes, setScheduleTimes] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
+  const [dosage, setDosage] = useState(medication?.dosage ?? '');
+  const [frequency, setFrequency] = useState(medication?.frequency ?? '');
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(medication?.schedule_times ?? []);
+  const [notes, setNotes] = useState(medication?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   const [showNamePicker, setShowNamePicker] = useState(false);
@@ -49,11 +51,12 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
+    if (isEdit) return;
     getFamilyDrugCatalog()
       .then(setDrugs)
       .catch(() => Alert.alert('Erro', 'Não foi possível carregar a lista de remédios.'))
       .finally(() => setLoadingDrugs(false));
-  }, []);
+  }, [isEdit]);
 
   function handleSelectDrug(drug: Drug) {
     setSelectedDrug(drug);
@@ -63,34 +66,60 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
   }
 
   function handleAddTime(selected: Date) {
-    const time = formatTime(selected);
-    setScheduleTimes((prev) => (prev.includes(time) ? prev : [...prev, time].sort()));
+    if (!frequency || isManualFrequency(frequency)) {
+      const time = formatTime(selected);
+      setScheduleTimes((prev) => (prev.includes(time) ? prev : [...prev, time].sort()));
+      return;
+    }
+    setScheduleTimes(computeScheduleTimes(frequency, selected.getHours(), selected.getMinutes()));
   }
 
   function handleRemoveTime(time: string) {
     setScheduleTimes((prev) => prev.filter((t) => t !== time));
   }
 
+  function handleSelectFrequency(f: string) {
+    setFrequency(f);
+    if (!isManualFrequency(f) && scheduleTimes.length > 0) {
+      const [h, m] = scheduleTimes[0].split(':').map(Number);
+      setScheduleTimes(computeScheduleTimes(f, h, m));
+    }
+  }
+
   async function handleSubmit() {
-    if (!selectedDrug || !dosage || !frequency || scheduleTimes.length === 0) {
-      Alert.alert('Atenção', 'Selecione o remédio, a dosagem, a frequência e ao menos um horário.');
+    if (!isEdit && !selectedDrug) {
+      Alert.alert('Atenção', 'Selecione o remédio.');
+      return;
+    }
+    if (!dosage || !frequency || scheduleTimes.length === 0) {
+      Alert.alert('Atenção', 'Preencha a dosagem, a frequência e ao menos um horário.');
       return;
     }
 
     setSaving(true);
     try {
-      await createFamilyMedication({
-        name: selectedDrug.name,
-        dosage,
-        frequency,
-        schedule_times: scheduleTimes,
-        start_date: new Date().toISOString().slice(0, 10),
-        notes: notes || undefined,
-      });
-      Alert.alert('Cadastrado', 'O remédio foi cadastrado para o paciente.');
+      if (isEdit && medication) {
+        await updateFamilyMedication(medication.uuid, {
+          dosage,
+          frequency,
+          schedule_times: scheduleTimes,
+          notes: notes || undefined,
+        });
+        Alert.alert('Atualizado', 'O remédio foi atualizado.');
+      } else if (selectedDrug) {
+        await createFamilyMedication({
+          name: selectedDrug.name,
+          dosage,
+          frequency,
+          schedule_times: scheduleTimes,
+          start_date: new Date().toISOString().slice(0, 10),
+          notes: notes || undefined,
+        });
+        Alert.alert('Cadastrado', 'O remédio foi cadastrado para o paciente.');
+      }
       onSaved();
     } catch {
-      Alert.alert('Erro', 'Não foi possível cadastrar o remédio. Tente novamente.');
+      Alert.alert('Erro', isEdit ? 'Não foi possível atualizar o remédio. Tente novamente.' : 'Não foi possível cadastrar o remédio. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -105,7 +134,7 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
           <View style={styles.headerLogoWrap}>
             <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
           </View>
-          <Text style={styles.headerTitle}>Adicionar remédio</Text>
+          <Text style={styles.headerTitle}>{isEdit ? 'Editar remédio' : 'Adicionar remédio'}</Text>
         </View>
         <TouchableOpacity style={styles.back} onPress={onBack} activeOpacity={0.75} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={styles.backText}>‹ Voltar</Text>
@@ -114,36 +143,57 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.subtitle}>Cadastra direto para o paciente, sem precisar de aprovação.</Text>
+      <Text style={styles.subtitle}>
+        {isEdit ? 'Altera a dosagem, frequência, horários ou observações.' : 'Cadastra direto para o paciente, sem precisar de aprovação.'}
+      </Text>
 
-      <TouchableOpacity style={styles.input} onPress={() => setShowNamePicker(true)} activeOpacity={0.75} disabled={loadingDrugs}>
-        {loadingDrugs ? (
-          <ActivityIndicator color={colors.blue} />
-        ) : (
-          <Text style={selectedDrug ? styles.pickerValue : styles.pickerPlaceholder}>
-            {selectedDrug ? selectedDrug.name : '💊 Selecionar remédio'}
-          </Text>
-        )}
-      </TouchableOpacity>
+      {isEdit ? (
+        <View style={styles.input}>
+          <Text style={styles.pickerValue}>{medication?.name}</Text>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.input} onPress={() => setShowNamePicker(true)} activeOpacity={0.75} disabled={loadingDrugs}>
+          {loadingDrugs ? (
+            <ActivityIndicator color={colors.blue} />
+          ) : (
+            <Text style={selectedDrug ? styles.pickerValue : styles.pickerPlaceholder}>
+              {selectedDrug ? selectedDrug.name : '💊 Selecionar remédio'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
 
-      {selectedDrug && (
+      {isEdit ? (
         <View style={styles.chipSection}>
           <Text style={styles.sectionLabel}>Dosagem</Text>
-          <View style={styles.chipRow}>
-            {selectedDrug.dosages.map((d) => (
-              <TouchableOpacity
-                key={d}
-                style={[styles.chip, dosage === d && styles.chipActive]}
-                onPress={() => setDosage(d)}
-              >
-                <Text style={[styles.chipText, dosage === d && styles.chipTextActive]}>{d}</Text>
-              </TouchableOpacity>
-            ))}
-            {selectedDrug.dosages.length === 0 && (
-              <Text style={styles.muted}>Nenhuma dosagem cadastrada para esse remédio.</Text>
-            )}
-          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: 500mg"
+            placeholderTextColor={colors.hint}
+            value={dosage}
+            onChangeText={setDosage}
+          />
         </View>
+      ) : (
+        selectedDrug && (
+          <View style={styles.chipSection}>
+            <Text style={styles.sectionLabel}>Dosagem</Text>
+            <View style={styles.chipRow}>
+              {selectedDrug.dosages.map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[styles.chip, dosage === d && styles.chipActive]}
+                  onPress={() => setDosage(d)}
+                >
+                  <Text style={[styles.chipText, dosage === d && styles.chipTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+              {selectedDrug.dosages.length === 0 && (
+                <Text style={styles.muted}>Nenhuma dosagem cadastrada para esse remédio.</Text>
+              )}
+            </View>
+          </View>
+        )
       )}
 
       <View style={styles.chipSection}>
@@ -153,7 +203,7 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
             <TouchableOpacity
               key={f}
               style={[styles.chip, frequency === f && styles.chipActive]}
-              onPress={() => setFrequency(f)}
+              onPress={() => handleSelectFrequency(f)}
             >
               <Text style={[styles.chipText, frequency === f && styles.chipTextActive]}>{f}</Text>
             </TouchableOpacity>
@@ -163,6 +213,11 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
 
       <View style={styles.chipSection}>
         <Text style={styles.sectionLabel}>Horários</Text>
+        {!!frequency && !isManualFrequency(frequency) && (
+          <Text style={styles.muted}>
+            Informe o 1º horário — os demais são calculados automaticamente pela frequência.
+          </Text>
+        )}
         <View style={styles.chipRow}>
           {scheduleTimes.map((t) => (
             <TouchableOpacity key={t} style={[styles.chip, styles.chipActive]} onPress={() => handleRemoveTime(t)}>
@@ -170,7 +225,9 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
             </TouchableOpacity>
           ))}
           <TouchableOpacity style={styles.addTimeChip} onPress={() => setShowTimePicker(true)}>
-            <Text style={styles.addTimeChipText}>+ Adicionar horário</Text>
+            <Text style={styles.addTimeChipText}>
+              {frequency && !isManualFrequency(frequency) && scheduleTimes.length > 0 ? '+ Recalcular horário' : '+ Adicionar horário'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -198,10 +255,10 @@ export default function FamilyAddMedicationScreen({ onBack, onSaved }: { onBack:
       />
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Cadastrar</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isEdit ? 'Salvar' : 'Cadastrar'}</Text>}
       </TouchableOpacity>
 
-      <Modal visible={showNamePicker} animationType="slide" onRequestClose={() => setShowNamePicker(false)}>
+      <Modal visible={!isEdit && showNamePicker} animationType="slide" onRequestClose={() => setShowNamePicker(false)}>
         <View style={styles.modalContainer}>
           <Text style={styles.title}>Selecionar remédio</Text>
           <TextInput

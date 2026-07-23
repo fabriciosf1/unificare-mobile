@@ -18,15 +18,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getDrugCatalog, requestMedication, type Drug } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
-
-const FREQUENCIES = [
-  '1x ao dia',
-  '2x ao dia (a cada 12h)',
-  '3x ao dia (a cada 8h)',
-  '4x ao dia (a cada 6h)',
-  'A cada 4h',
-  'Se necessário',
-];
+import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
@@ -62,12 +54,24 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   }
 
   function handleAddTime(selected: Date) {
-    const time = formatTime(selected);
-    setScheduleTimes((prev) => (prev.includes(time) ? prev : [...prev, time].sort()));
+    if (!frequency || isManualFrequency(frequency)) {
+      const time = formatTime(selected);
+      setScheduleTimes((prev) => (prev.includes(time) ? prev : [...prev, time].sort()));
+      return;
+    }
+    setScheduleTimes(computeScheduleTimes(frequency, selected.getHours(), selected.getMinutes()));
   }
 
   function handleRemoveTime(time: string) {
     setScheduleTimes((prev) => prev.filter((t) => t !== time));
+  }
+
+  function handleSelectFrequency(f: string) {
+    setFrequency(f);
+    if (!isManualFrequency(f) && scheduleTimes.length > 0) {
+      const [h, m] = scheduleTimes[0].split(':').map(Number);
+      setScheduleTimes(computeScheduleTimes(f, h, m));
+    }
   }
 
   async function handleSubmit() {
@@ -152,7 +156,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
             <TouchableOpacity
               key={f}
               style={[styles.chip, frequency === f && styles.chipActive]}
-              onPress={() => setFrequency(f)}
+              onPress={() => handleSelectFrequency(f)}
             >
               <Text style={[styles.chipText, frequency === f && styles.chipTextActive]}>{f}</Text>
             </TouchableOpacity>
@@ -162,6 +166,11 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
 
       <View style={styles.chipSection}>
         <Text style={styles.sectionLabel}>Horários</Text>
+        {!!frequency && !isManualFrequency(frequency) && (
+          <Text style={styles.muted}>
+            Informe o 1º horário — os demais são calculados automaticamente pela frequência.
+          </Text>
+        )}
         <View style={styles.chipRow}>
           {scheduleTimes.map((t) => (
             <TouchableOpacity key={t} style={[styles.chip, styles.chipActive]} onPress={() => handleRemoveTime(t)}>
@@ -169,7 +178,9 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
             </TouchableOpacity>
           ))}
           <TouchableOpacity style={styles.addTimeChip} onPress={() => setShowTimePicker(true)}>
-            <Text style={styles.addTimeChipText}>+ Adicionar horário</Text>
+            <Text style={styles.addTimeChipText}>
+              {frequency && !isManualFrequency(frequency) && scheduleTimes.length > 0 ? '+ Recalcular horário' : '+ Adicionar horário'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

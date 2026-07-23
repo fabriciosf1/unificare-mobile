@@ -110,6 +110,22 @@ export function createFamilyMedication(data: NewMedicationInput): Promise<Medica
   return api.post<Medication>('/family/medications', data);
 }
 
+export interface UpdateMedicationInput {
+  name?: string;
+  dosage?: string;
+  frequency?: string;
+  schedule_times?: string[];
+  notes?: string;
+}
+
+export function updateFamilyMedication(uuid: string, data: UpdateMedicationInput): Promise<Medication> {
+  return api.put<Medication>(`/family/medications/${uuid}`, data);
+}
+
+export function deleteFamilyMedication(uuid: string): Promise<void> {
+  return api.delete(`/family/medications/${uuid}`);
+}
+
 export interface NewAppointmentInput {
   appointment_date: string;
   appointment_time: string;

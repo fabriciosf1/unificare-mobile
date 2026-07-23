@@ -12,16 +12,25 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getFamilyMedicationsToday, logFamilyMedication } from '../services/family.service';
+import { deleteFamilyMedication, getFamilyMedicationsToday, logFamilyMedication } from '../services/family.service';
 import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
-export default function FamilyMedicationsScreen({ onBack, onAddMedication }: { onBack: () => void; onAddMedication: () => void }) {
+export default function FamilyMedicationsScreen({
+  onBack,
+  onAddMedication,
+  onEditMedication,
+}: {
+  onBack: () => void;
+  onAddMedication: () => void;
+  onEditMedication: (medication: Medication) => void;
+}) {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const data = await getFamilyMedicationsToday();
@@ -57,6 +66,27 @@ export default function FamilyMedicationsScreen({ onBack, onAddMedication }: { o
     } finally {
       setConfirming(null);
     }
+  }
+
+  function handleDelete(med: Medication) {
+    Alert.alert('Excluir remédio', `Deseja excluir "${med.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(med.uuid);
+          try {
+            await deleteFamilyMedication(med.uuid);
+            await loadData();
+          } catch {
+            Alert.alert('Erro', 'Não foi possível excluir o remédio. Tente novamente.');
+          } finally {
+            setDeleting(null);
+          }
+        },
+      },
+    ]);
   }
 
   return (
@@ -106,8 +136,35 @@ export default function FamilyMedicationsScreen({ onBack, onAddMedication }: { o
 
         {!loading && !error && medications.map((med) => (
           <View key={med.uuid} style={styles.card}>
-            <Text style={styles.medName}>{med.name}</Text>
-            <Text style={styles.medDosage}>{med.dosage} • {med.frequency}</Text>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.medName}>{med.name}</Text>
+                <Text style={styles.medDosage}>{med.dosage} • {med.frequency}</Text>
+              </View>
+              <View style={styles.cardActions}>
+                <TouchableOpacity
+                  style={styles.cardActionButton}
+                  onPress={() => onEditMedication(med)}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.cardActionText}>✏️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cardActionButton}
+                  onPress={() => handleDelete(med)}
+                  disabled={deleting === med.uuid}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  {deleting === med.uuid ? (
+                    <ActivityIndicator size="small" color={colors.red} />
+                  ) : (
+                    <Text style={styles.cardActionText}>🗑️</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {med.approval_status === 'pending' && (
               <Text style={styles.pendingLabel}>Aguardando aprovação</Text>
@@ -213,6 +270,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   muted: { fontSize: typography.label, color: colors.muted },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  cardHeaderText: { flex: 1, marginRight: spacing.sm },
+  cardActions: { flexDirection: 'row', gap: 6 },
+  cardActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardActionText: { fontSize: 15 },
   medName: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text },
   medDosage: { fontSize: 14, color: colors.muted, marginTop: 2, marginBottom: spacing.sm },
   pendingLabel: { color: colors.yellow, fontWeight: '700', fontSize: 14 },
