@@ -22,6 +22,11 @@ export async function startBackgroundLocation(): Promise<void> {
   const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
   if (fgStatus !== 'granted') return;
 
+  // Pedir a permissão de segundo plano imediatamente após a de primeiro plano faz o Android
+  // suprimir o diálogo "Permitir o tempo todo" sem avisar (limite de 1 diálogo de permissão
+  // por vez do sistema) — um respiro entre as duas chamadas evita a negação silenciosa.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
   if (bgStatus !== 'granted') return;
 

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -64,7 +65,12 @@ export default function ChangePasswordScreen({
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.surface }]}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}
+      >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.brandBlock}>
           <LinearGradient
             colors={theme.gradient}
@@ -119,6 +125,7 @@ export default function ChangePasswordScreen({
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Salvar e continuar</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

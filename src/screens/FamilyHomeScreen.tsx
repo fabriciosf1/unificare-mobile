@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { familyLogout } from '../services/auth.service';
 import {
   approveAppointment,
@@ -116,6 +117,7 @@ export default function FamilyHomeScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requestingCamera, setRequestingCamera] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
     const [c, p, loc] = await Promise.all([familyMe(), getPendingApprovals(), getLatestLocation()]);
@@ -295,7 +297,7 @@ export default function FamilyHomeScreen({
       </View>
     </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TouchableOpacity style={styles.footerItem} onPress={onOpenAlerts} activeOpacity={0.75}>
           <Text style={styles.footerIcon}>🚨</Text>
           <Text style={styles.footerLabel}>Alertas</Text>

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -101,7 +102,8 @@ export default function FamilyProfileScreen({ onBack }: { onBack: () => void }) 
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.sectionTitle}>Meus dados</Text>
         <TextInput style={styles.input} placeholder="Nome" placeholderTextColor={colors.hint} value={name} onChangeText={setName} />
         <TextInput style={styles.input} placeholder="Telefone" placeholderTextColor={colors.hint} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
@@ -147,6 +149,7 @@ export default function FamilyProfileScreen({ onBack }: { onBack: () => void }) 
           {savingPassword ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Trocar senha</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

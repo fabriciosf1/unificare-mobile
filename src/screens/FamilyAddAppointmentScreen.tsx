@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -86,7 +87,8 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Agendada direto para o paciente, sem precisar de aprovação.</Text>
 
       <View style={styles.typeRow}>
@@ -157,6 +159,7 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Agendar</Text>}
       </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

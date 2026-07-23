@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -110,7 +111,8 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Fica pendente de aprovação da sua família antes de valer.</Text>
 
       <TouchableOpacity style={styles.input} onPress={() => setShowNamePicker(true)} activeOpacity={0.75} disabled={loadingDrugs}>
@@ -224,6 +226,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         </View>
       </Modal>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

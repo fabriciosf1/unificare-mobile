@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -112,7 +113,8 @@ export default function FamilyAddExamScreen({ onBack, onSaved }: { onBack: () =>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.subtitle}>Exame, receita ou atestado do paciente — envia direto, sem precisar de aprovação.</Text>
 
         <View style={styles.chipRow}>
@@ -183,6 +185,7 @@ export default function FamilyAddExamScreen({ onBack, onSaved }: { onBack: () =>
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

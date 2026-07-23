@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StatusBar, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import notifee, { EventType } from 'react-native-notify-kit';
 import { getToken, getRole, AppRole } from './src/services/api';
@@ -94,8 +95,10 @@ export default function App() {
           } catch {
             // se a checagem falhar, segue o fluxo normal — a API vai barrar em outra chamada se o token for inválido
           }
-          startBackgroundLocation().catch(() => {});
-          setupMedicationAlarms().catch(() => {});
+          // Sequencial de propósito: pedir várias permissões do Android ao mesmo tempo faz o
+          // sistema só exibir um diálogo e descartar os outros silenciosamente.
+          await startBackgroundLocation().catch(() => {});
+          await setupMedicationAlarms().catch(() => {});
         } else if (storedRole === 'family') {
           try {
             const contact = await familyMe();
@@ -160,7 +163,7 @@ export default function App() {
     };
   }, []);
 
-  function handleLoggedIn(loggedInRole: AppRole, mustChange?: boolean) {
+  async function handleLoggedIn(loggedInRole: AppRole, mustChange?: boolean) {
     setLoggedIn(true);
     setRole(loggedInRole);
     setAuthScreen('login');
@@ -169,22 +172,24 @@ export default function App() {
       return;
     }
     if (loggedInRole === 'patient') {
-      registerForPushNotifications().catch(() => {});
-      startBackgroundLocation().catch(() => {});
-      setupMedicationAlarms().catch(() => {});
+      // Sequencial de propósito: pedir várias permissões do Android ao mesmo tempo faz o
+      // sistema só exibir um diálogo e descartar os outros silenciosamente.
+      await registerForPushNotifications().catch(() => {});
+      await startBackgroundLocation().catch(() => {});
+      await setupMedicationAlarms().catch(() => {});
     } else {
-      registerForFamilyPushNotifications().catch(() => {});
+      await registerForFamilyPushNotifications().catch(() => {});
     }
   }
 
-  function handlePasswordChanged() {
+  async function handlePasswordChanged() {
     setMustChangePassword(false);
     if (role === 'patient') {
-      registerForPushNotifications().catch(() => {});
-      startBackgroundLocation().catch(() => {});
-      setupMedicationAlarms().catch(() => {});
+      await registerForPushNotifications().catch(() => {});
+      await startBackgroundLocation().catch(() => {});
+      await setupMedicationAlarms().catch(() => {});
     } else if (role === 'family') {
-      registerForFamilyPushNotifications().catch(() => {});
+      await registerForFamilyPushNotifications().catch(() => {});
     }
   }
 
@@ -200,9 +205,11 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.teal} />
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.teal} />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
@@ -210,7 +217,7 @@ export default function App() {
   const statusBarStyle = role ? 'light-content' : 'dark-content';
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBackground} />
       {!loggedIn && authScreen === 'login' && (
         <LoginScreen onLoggedIn={handleLoggedIn} onForgotPassword={() => setAuthScreen('forgotPassword')} />
@@ -305,7 +312,7 @@ export default function App() {
       {loggedIn && role === 'patient' && patientScreen === 'sosCamera' && sosCall && (
         <SosCameraScreen patientId={sosCall.patientId} onClose={() => setPatientScreen('home')} />
       )}
-    </>
+    </SafeAreaProvider>
   );
 }
 

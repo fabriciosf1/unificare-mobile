@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "504351480015",
+    "project_id": "unifcare-f164c",
+    "storage_bucket": "unifcare-f164c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:504351480015:android:bde137986e2ee2789d3fba",
+        "android_client_info": {
+          "package_name": "com.unifcare.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDi54gr00eF-RJs8s0Tb9-Q8fyKZJUS5og"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

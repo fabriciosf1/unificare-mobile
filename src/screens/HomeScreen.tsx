@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout, me } from '../services/auth.service';
 import { getLatestVital, getTodayMedications, logMedication } from '../services/patient.service';
 import { MEDICATION_TAKEN_EVENT, snoozeMedicationAlarm, syncMedicationAlarms } from '../services/alarm.service';
@@ -47,6 +48,7 @@ export default function HomeScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{ title: string; message?: string } | null>(null);
+  const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
     const [p, v, meds] = await Promise.all([me(), getLatestVital(), getTodayMedications()]);
@@ -283,7 +285,7 @@ export default function HomeScreen({
       </Modal>
     </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TouchableOpacity style={styles.footerItem} onPress={onAddMedication} activeOpacity={0.75}>
           <Text style={styles.footerIcon}>💊</Text>
           <Text style={styles.footerLabel}>Remédio</Text>
