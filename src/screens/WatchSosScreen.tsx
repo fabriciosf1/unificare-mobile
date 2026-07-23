@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import {
+  mediaDevices,
   MediaStream,
   RTCIceCandidate,
   RTCPeerConnection,
@@ -37,10 +38,18 @@ export default function WatchSosScreen({
   const insets = useSafeAreaInsets();
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const pusherRef = useRef<Pusher | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const cleanup = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearInterval(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     pcRef.current?.close();
     pcRef.current = null;
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current = null;
     if (pusherRef.current) {
       unsubscribeCameraChannel(pusherRef.current, patientId);
       pusherRef.current = null;
@@ -61,11 +70,24 @@ export default function WatchSosScreen({
 
     (async () => {
      try {
+      // Microfone da família — sem isso a chamada é só monitoramento, sem conversa dos dois lados.
+      let micStream: MediaStream | null = null;
+      try {
+        micStream = await mediaDevices.getUserMedia({ audio: true }) as unknown as MediaStream;
+      } catch {
+        // Segue sem áudio próprio se a permissão for negada — ainda assim assiste ao vídeo/áudio do paciente.
+      }
+      if (cancelled) {
+        micStream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      micStreamRef.current = micStream;
+
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
 
       pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
+      micStream?.getTracks().forEach((track) => pc.addTrack(track, micStream as MediaStream));
 
       pc.ontrack = (event: { streams: MediaStream[] }) => {
         if (event.streams[0]) {
@@ -82,7 +104,14 @@ export default function WatchSosScreen({
       const { pusher, channel } = subscribeCameraChannel(patientId);
       pusherRef.current = pusher;
 
+      let answered = false;
+
       channel.bind('camera.answer', async (e: { session_id: string; sdp: RTCSessionDescriptionInit }) => {
+        answered = true;
+        if (retryTimerRef.current) {
+          clearInterval(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
         try {
           await pc.setRemoteDescription(new RTCSessionDescription({ sdp: e.sdp.sdp ?? '', type: e.sdp.type }));
         } catch {}
@@ -95,16 +124,13 @@ export default function WatchSosScreen({
         } catch {}
       });
 
-      const pendingCandidates: RTCIceCandidate[] = [];
+      const gatheredCandidates: RTCIceCandidate[] = [];
       let sid: string | null = null;
 
       pc.onicecandidate = (event: { candidate: RTCIceCandidate | null }) => {
         if (!event.candidate) return;
-        if (!sid) {
-          pendingCandidates.push(event.candidate);
-          return;
-        }
-        cameraService.sendFamilyIce(sid, event.candidate.toJSON());
+        gatheredCandidates.push(event.candidate);
+        if (sid) cameraService.sendFamilyIce(sid, event.candidate.toJSON());
       };
 
       const offer = await pc.createOffer();
@@ -112,14 +138,36 @@ export default function WatchSosScreen({
 
       if (cancelled) return;
 
-      const { session_id } = await cameraService.sendFamilyOffer(offer);
-      sid = session_id;
+      // O app do paciente pode ainda não ter recebido o push nem se inscrito no canal quando a
+      // primeira offer chega (o canal não faz replay de eventos passados). Reenviamos a mesma
+      // offer periodicamente até a answer chegar, o que resolve essa corrida sem precisar de um
+      // handshake extra — o app do paciente ignora as ofertas repetidas depois de aceitar a 1ª.
+      const sendOffer = async () => {
+        try {
+          const { session_id } = await cameraService.sendFamilyOffer(offer);
+          sid = session_id;
+          gatheredCandidates.forEach((candidate) => {
+            cameraService.sendFamilyIce(session_id, candidate.toJSON());
+          });
+        } catch {}
+      };
 
-      pendingCandidates.splice(0).forEach((candidate) => {
-        cameraService.sendFamilyIce(sid as string, candidate.toJSON());
-      });
-
+      await sendOffer();
       if (!cancelled) setConnState('waiting');
+
+      let attempts = 1;
+      retryTimerRef.current = setInterval(() => {
+        if (answered || attempts >= 5) {
+          if (retryTimerRef.current) {
+            clearInterval(retryTimerRef.current);
+            retryTimerRef.current = null;
+          }
+          if (!answered && !cancelled) setConnState('failed');
+          return;
+        }
+        attempts += 1;
+        sendOffer();
+      }, 2500);
      } catch {
        if (!cancelled) setConnState('failed');
      }

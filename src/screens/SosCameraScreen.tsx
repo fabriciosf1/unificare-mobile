@@ -79,6 +79,10 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
       pusherRef.current = pusher;
 
       channel.bind('camera.offer', async (e: { session_id: string; sdp: RTCSessionDescriptionInit }) => {
+        // A família reenvia a offer (retry) até receber a answer, pois pode chegar antes de nos
+        // inscrevermos no canal. Uma vez que já criamos a conexão, ignoramos os reenvios redundantes.
+        if (pcRef.current) return;
+
         sessionIdRef.current = e.session_id;
         setConnState('waiting_offer');
 
@@ -86,6 +90,10 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
         pcRef.current = pc;
 
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+        // Áudio de volta da família (ela também envia o próprio microfone) — o react-native-webrtc
+        // já roteia a track remota pro alto-falante nativo assim que chega, sem precisar de player.
+        pc.ontrack = () => {};
 
         pc.onicecandidate = (event: { candidate: RTCIceCandidate | null }) => {
           if (!event.candidate || !sessionIdRef.current) return;
