@@ -108,7 +108,11 @@ export default function HomeScreen({
   }
 
   async function handleSnooze(medication: Medication, dose: MedicationDose) {
-    await snoozeMedicationAlarm(medication, dose.time, dose.scheduled_at);
+    try {
+      await snoozeMedicationAlarm(medication, dose.time, dose.scheduled_at);
+    } catch {
+      setAlertInfo({ title: 'Erro', message: 'Não foi possível adiar o alarme.' });
+    }
   }
 
   async function handleLogout() {

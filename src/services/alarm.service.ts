@@ -24,6 +24,11 @@ function alarmId(medicationId: number, doseTime: string): string {
   return `${ALARM_ID_PREFIX}${medicationId}-${doseTime}`;
 }
 
+/** Doses adiadas pelo usuário (id do alarme → timestamp alvo). syncMedicationAlarms consulta
+ * este mapa para não recriar, antes da hora, um alarme que acabou de ser adiado — o backend não
+ * tem noção de "adiar", então sem isso todo resume do app (AppState) desfazia o snooze. */
+const snoozedUntil = new Map<string, number>();
+
 export async function initAlarmChannel(): Promise<void> {
   await notifee.requestPermission();
   await notifee.createChannel({
@@ -113,8 +118,17 @@ export async function syncMedicationAlarms(medications: Medication[]): Promise<v
     for (const dose of medication.today_doses) {
       if (dose.status !== 'pending') continue;
 
-      const scheduledTime = new Date(dose.scheduled_at).getTime();
-      const timestamp = scheduledTime > now ? scheduledTime : now + 5000;
+      const id = alarmId(medication.id, dose.time);
+      const snoozeTarget = snoozedUntil.get(id);
+
+      let timestamp: number;
+      if (snoozeTarget && snoozeTarget > now) {
+        timestamp = snoozeTarget;
+      } else {
+        snoozedUntil.delete(id);
+        const scheduledTime = new Date(dose.scheduled_at).getTime();
+        timestamp = scheduledTime > now ? scheduledTime : now + 5000;
+      }
 
       await scheduleAlarm(medication, dose.time, dose.scheduled_at, timestamp);
     }
@@ -122,7 +136,9 @@ export async function syncMedicationAlarms(medications: Medication[]): Promise<v
 }
 
 export async function cancelMedicationAlarm(medicationId: number, doseTime: string): Promise<void> {
-  await notifee.cancelNotification(alarmId(medicationId, doseTime));
+  const id = alarmId(medicationId, doseTime);
+  snoozedUntil.delete(id);
+  await notifee.cancelNotification(id);
 }
 
 export async function snoozeMedicationAlarm(
@@ -130,7 +146,13 @@ export async function snoozeMedicationAlarm(
   doseTime: string,
   scheduledAt: string,
 ): Promise<void> {
-  await scheduleAlarm(medication, doseTime, scheduledAt, Date.now() + 10 * 60 * 1000);
+  const id = alarmId(medication.id, doseTime);
+  const target = Date.now() + 10 * 60 * 1000;
+  snoozedUntil.set(id, target);
+  // Cancela a notificação "ongoing" já exibida (disparada) antes de recriar — createTriggerNotification
+  // com o mesmo id substitui um trigger pendente, mas não necessariamente uma notificação já tocando.
+  await notifee.cancelNotification(id);
+  await scheduleAlarm(medication, doseTime, scheduledAt, target);
 }
 
 export async function handleAlarmAction(
