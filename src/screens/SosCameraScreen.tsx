@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import InCallManager from 'react-native-incall-manager';
 import {
   mediaDevices,
   MediaStream,
@@ -44,8 +45,14 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
     // Sem isso o Android bloqueia a tela durante a transmissão e o SO mata o acesso
     // à câmera em background — ao desbloquear, o vídeo fica congelado/preto.
     activateKeepAwakeAsync('sos-camera').catch(() => {});
+    // Sem o InCallManager o áudio do WebRTC sai pelo volume de mídia (baixo, sem ganho de
+    // chamada) em vez do volume/roteamento de chamada de voz — força o modo de chamada
+    // com o alto-falante ligado (média 'video' já ativa o speaker por padrão).
+    InCallManager.start({ media: 'video' });
+    InCallManager.setSpeakerphoneOn(true);
     return () => {
       deactivateKeepAwake('sos-camera').catch(() => {});
+      InCallManager.stop();
     };
   }, []);
 

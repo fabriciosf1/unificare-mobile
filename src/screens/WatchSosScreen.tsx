@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import InCallManager from 'react-native-incall-manager';
 import {
   mediaDevices,
   MediaStream,
@@ -60,8 +61,14 @@ export default function WatchSosScreen({
     // Impede a tela de bloquear enquanto assiste — no lock, o SO suspende a conexão
     // e o vídeo trava congelado (preto) mesmo depois de desbloquear.
     activateKeepAwakeAsync('watch-sos').catch(() => {});
+    // Sem o InCallManager o áudio do WebRTC sai pelo volume de mídia (baixo, sem ganho de
+    // chamada) em vez do volume/roteamento de chamada de voz — força o modo de chamada
+    // com o alto-falante ligado (média 'video' já ativa o speaker por padrão).
+    InCallManager.start({ media: 'video' });
+    InCallManager.setSpeakerphoneOn(true);
     return () => {
       deactivateKeepAwake('watch-sos').catch(() => {});
+      InCallManager.stop();
     };
   }, []);
 
