@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import {
   MediaStream,
   RTCIceCandidate,
@@ -10,6 +12,7 @@ import {
 import type Pusher from 'pusher-js';
 import { cameraService } from '../services/camera.service';
 import { subscribeCameraChannel, unsubscribeCameraChannel } from '../services/realtime';
+import { respondToAlert } from '../services/family.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 type ConnState = 'requesting' | 'waiting' | 'connected' | 'failed';
@@ -20,14 +23,18 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 export default function WatchSosScreen({
   patientId,
   patientName,
+  alertUuid,
   onClose,
 }: {
   patientId: number;
   patientName: string;
+  alertUuid?: string;
   onClose: () => void;
 }) {
   const [connState, setConnState] = useState<ConnState>('requesting');
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [responding, setResponding] = useState(false);
+  const insets = useSafeAreaInsets();
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const pusherRef = useRef<Pusher | null>(null);
 
@@ -39,6 +46,15 @@ export default function WatchSosScreen({
       pusherRef.current = null;
     }
   }, [patientId]);
+
+  useEffect(() => {
+    // Impede a tela de bloquear enquanto assiste — no lock, o SO suspende a conexão
+    // e o vídeo trava congelado (preto) mesmo depois de desbloquear.
+    activateKeepAwakeAsync('watch-sos').catch(() => {});
+    return () => {
+      deactivateKeepAwake('watch-sos').catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +136,21 @@ export default function WatchSosScreen({
     onClose();
   }
 
+  // Confirma o desfecho do SOS pro operador — puramente informativo, não resolve o alerta
+  // (só o operador decide isso via Urgent.tsx). Best-effort: fecha mesmo se a rede falhar.
+  async function handleRespond(response: 'ok' | 'help') {
+    if (!alertUuid || responding) return;
+    setResponding(true);
+    try {
+      await respondToAlert(alertUuid, response);
+    } catch {
+      // best-effort
+    } finally {
+      cleanup();
+      onClose();
+    }
+  }
+
   return (
     <View style={styles.container}>
       {remoteStream ? (
@@ -135,7 +166,7 @@ export default function WatchSosScreen({
         </View>
       )}
 
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { paddingBottom: spacing.lg + insets.bottom }]}>
         <View style={styles.statusRow}>
           <View
             style={[
@@ -148,9 +179,30 @@ export default function WatchSosScreen({
           <Text style={styles.statusText}>{patientName} — SOS ao vivo</Text>
         </View>
 
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.85}>
-          <Text style={styles.closeButtonText}>Fechar</Text>
-        </TouchableOpacity>
+        {alertUuid ? (
+          <View style={styles.responseRow}>
+            <TouchableOpacity
+              style={[styles.closeButton, styles.responseButton, styles.okButton]}
+              onPress={() => handleRespond('ok')}
+              disabled={responding}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.closeButtonText}>✅ Está tudo bem</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.closeButton, styles.responseButton, styles.helpButton]}
+              onPress={() => handleRespond('help')}
+              disabled={responding}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.closeButtonText}>⚠️ Precisa de ajuda</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.85}>
+            <Text style={styles.closeButtonText}>Fechar</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -184,4 +236,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeButtonText: { color: '#fff', fontWeight: '700', fontSize: typography.label },
+  responseRow: { flexDirection: 'row', gap: spacing.sm },
+  responseButton: { flex: 1 },
+  okButton: { backgroundColor: colors.green },
+  helpButton: { backgroundColor: colors.red },
 });

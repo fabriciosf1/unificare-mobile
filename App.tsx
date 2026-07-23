@@ -6,7 +6,7 @@ import notifee, { EventType } from 'react-native-notify-kit';
 import { getToken, getRole, AppRole } from './src/services/api';
 import { me as getPatientMe } from './src/services/auth.service';
 import { familyMe } from './src/services/family.service';
-import { registerForPushNotifications, registerForFamilyPushNotifications } from './src/services/push.service';
+import { registerForPushNotifications, registerForFamilyPushNotifications, ensureCriticalAlertChannel } from './src/services/push.service';
 import { startBackgroundLocation } from './src/services/location.service';
 import {
   handleAlarmAction,
@@ -45,6 +45,9 @@ type AuthScreen = 'login' | 'forgotPassword';
 interface SosCallData {
   patientId: number;
   patientName: string;
+  // Presente só quando a tela foi aberta por um SOS de verdade (push 'sos_call') — ausente
+  // quando é o familiar apenas pedindo pra ver a câmera por conta própria (sem alerta associado).
+  alertUuid?: string;
 }
 
 async function setupMedicationAlarms(): Promise<void> {
@@ -124,6 +127,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    ensureCriticalAlertChannel().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     return notifee.onForegroundEvent(({ type, detail }) => {
       if (type === EventType.ACTION_PRESS) {
         handleAlarmAction(type, detail).catch(() => {});
@@ -131,32 +138,57 @@ export default function App() {
     });
   }, []);
 
+  const pendingNotificationRef = useRef<Record<string, unknown> | null>(null);
+
   useEffect(() => {
     function handleSosNotification(data: Record<string, unknown>) {
-      if (data?.type !== 'sos_call' || roleRef.current !== 'family') return;
+      if (data?.type !== 'sos_call' || roleRef.current !== 'family') return false;
       const patientId = Number(data.patientId);
-      if (!patientId) return;
-      setSosCall({ patientId, patientName: String(data.patientName ?? 'Paciente') });
+      if (!patientId) return false;
+      setSosCall({
+        patientId,
+        patientName: String(data.patientName ?? 'Paciente'),
+        alertUuid: data.alertUuid ? String(data.alertUuid) : undefined,
+      });
       setFamilyScreen('watchSos');
+      return true;
     }
 
     function handleCameraRequestNotification(data: Record<string, unknown>) {
-      if (data?.type !== 'camera_request' || roleRef.current !== 'patient') return;
+      if (data?.type !== 'camera_request' || roleRef.current !== 'patient') return false;
       const patientId = Number(data.patientId);
-      if (!patientId) return;
+      if (!patientId) return false;
       setSosCall({ patientId, patientName: '' });
       setPatientScreen('sosCamera');
+      return true;
     }
+
+    // Se o role ainda não foi restaurado da sessão (cold start), a notificação não pode
+    // ser roteada ainda — guarda pra reprocessar assim que `role` resolver (ver efeito abaixo).
+    function routeNotification(data: Record<string, unknown>) {
+      if (roleRef.current === null) {
+        pendingNotificationRef.current = data;
+        return;
+      }
+      const handled = handleSosNotification(data) || handleCameraRequestNotification(data);
+      if (!handled) pendingNotificationRef.current = null;
+    }
+
+    // A resposta que efetivamente abriu o app (cold start) pode não chegar no listener "ao
+    // vivo" abaixo — a Expo recomenda checar getLastNotificationResponseAsync no mount.
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      routeNotification(data);
+    });
 
     const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data as Record<string, unknown>;
-      handleSosNotification(data);
-      handleCameraRequestNotification(data);
+      routeNotification(data);
     });
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
-      handleSosNotification(data);
-      handleCameraRequestNotification(data);
+      routeNotification(data);
     });
 
     return () => {
@@ -164,6 +196,31 @@ export default function App() {
       responseSub.remove();
     };
   }, []);
+
+  // Reprocessa a notificação que chegou antes de a sessão (role) terminar de restaurar.
+  useEffect(() => {
+    if (role === null) return;
+    const pending = pendingNotificationRef.current;
+    if (!pending) return;
+    pendingNotificationRef.current = null;
+    if (pending.type === 'sos_call' && role === 'family') {
+      const patientId = Number(pending.patientId);
+      if (patientId) {
+        setSosCall({
+          patientId,
+          patientName: String(pending.patientName ?? 'Paciente'),
+          alertUuid: pending.alertUuid ? String(pending.alertUuid) : undefined,
+        });
+        setFamilyScreen('watchSos');
+      }
+    } else if (pending.type === 'camera_request' && role === 'patient') {
+      const patientId = Number(pending.patientId);
+      if (patientId) {
+        setSosCall({ patientId, patientName: '' });
+        setPatientScreen('sosCamera');
+      }
+    }
+  }, [role]);
 
   async function handleLoggedIn(loggedInRole: AppRole, mustChange?: boolean) {
     setLoggedIn(true);
@@ -349,6 +406,7 @@ export default function App() {
         <WatchSosScreen
           patientId={sosCall.patientId}
           patientName={sosCall.patientName}
+          alertUuid={sosCall.alertUuid}
           onClose={() => setFamilyScreen('home')}
         />
       )}

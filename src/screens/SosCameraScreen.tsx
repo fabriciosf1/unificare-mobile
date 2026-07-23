@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import {
   mediaDevices,
   MediaStream,
@@ -21,6 +23,7 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 export default function SosCameraScreen({ patientId, onClose }: { patientId: number; onClose: () => void }) {
   const [connState, setConnState] = useState<ConnState>('starting');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const insets = useSafeAreaInsets();
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const pusherRef = useRef<Pusher | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -36,6 +39,15 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
       pusherRef.current = null;
     }
   }, [patientId]);
+
+  useEffect(() => {
+    // Sem isso o Android bloqueia a tela durante a transmissão e o SO mata o acesso
+    // à câmera em background — ao desbloquear, o vídeo fica congelado/preto.
+    activateKeepAwakeAsync('sos-camera').catch(() => {});
+    return () => {
+      deactivateKeepAwake('sos-camera').catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +136,7 @@ export default function SosCameraScreen({ patientId, onClose }: { patientId: num
         <View style={styles.placeholder} />
       )}
 
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { paddingBottom: spacing.lg + insets.bottom }]}>
         <View style={styles.statusRow}>
           <View
             style={[

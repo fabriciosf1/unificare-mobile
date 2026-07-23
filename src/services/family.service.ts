@@ -93,6 +93,12 @@ export function requestCamera(): Promise<void> {
   return api.post('/family/camera/request');
 }
 
+// Confirma o desfecho de um SOS depois de assistir a câmera ao vivo — puramente informativo
+// pro operador (não resolve o alerta), ver AlertController::familyRespond.
+export function respondToAlert(alertUuid: string, response: 'ok' | 'help'): Promise<void> {
+  return api.post(`/family/alerts/${alertUuid}/respond`, { response });
+}
+
 export function getFamilyDrugCatalog(): Promise<Drug[]> {
   return api.get<Drug[]>('/family/drugs');
 }

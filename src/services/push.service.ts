@@ -5,6 +5,25 @@ import { Platform } from 'react-native';
 import { registerPushToken } from './patient.service';
 import { registerFamilyPushToken } from './family.service';
 
+export const CRITICAL_CHANNEL_ID = 'alertas-criticos';
+
+/** Canal Android dedicado a SOS/pedido de câmera/remédio atrasado — importância máxima +
+ * bypassDnd faz o aparelho vibrar/tocar mesmo com o modo silencioso ativado, igual um
+ * alarme. Precisa existir ANTES do push chegar (o servidor só referencia o channelId).
+ * Idempotente: seguro chamar em todo boot do app. */
+export async function ensureCriticalAlertChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(CRITICAL_CHANNEL_ID, {
+    name: 'Alertas críticos (SOS)',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: 'alarm_sound',
+    vibrationPattern: [0, 500, 250, 500, 250, 500],
+    enableVibrate: true,
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
+
 async function getExpoPushToken(): Promise<string | null> {
   if (!Device.isDevice) {
     return null;
