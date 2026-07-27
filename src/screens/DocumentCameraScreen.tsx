@@ -1,14 +1,18 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../theme';
 
-// Proporção A4 (210x297mm) para orientar o enquadramento do documento na foto.
+// Proporção A4 (210x297mm), só como guia — a moldura ocupa o máximo de espaço
+// disponível na tela pra permitir fotografar de perto (documentos com muito
+// texto ficam ilegíveis pra IA se o usuário precisar se afastar demais pra
+// encaixar a folha inteira numa moldura pequena).
 const A4_RATIO = 210 / 297;
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const FRAME_WIDTH = SCREEN_WIDTH * 0.82;
-const FRAME_HEIGHT = FRAME_WIDTH / A4_RATIO;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const HINT_SPACE = 64;
+const SHUTTER_SPACE = 76 + spacing.lg * 2;
 
 interface Props {
   onCancel: () => void;
@@ -40,12 +44,39 @@ export default function DocumentCameraScreen({ onCancel, onCaptured, accentColor
     );
   }
 
+  const topReserved = insets.top + HINT_SPACE;
+  const bottomReserved = insets.bottom + SHUTTER_SPACE;
+  const availableHeight = SCREEN_HEIGHT - topReserved - bottomReserved;
+  const frameWidth = Math.min(SCREEN_WIDTH * 0.95, availableHeight * A4_RATIO);
+  const frameHeight = frameWidth / A4_RATIO;
+  const frameLeft = (SCREEN_WIDTH - frameWidth) / 2;
+  const frameTop = topReserved + (availableHeight - frameHeight) / 2;
+
   async function handleCapture() {
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
-      if (photo?.uri) onCaptured(photo.uri);
+      if (!photo?.uri) return;
+
+      const xFrac = frameLeft / SCREEN_WIDTH;
+      const yFrac = frameTop / SCREEN_HEIGHT;
+      const wFrac = frameWidth / SCREEN_WIDTH;
+      const hFrac = frameHeight / SCREEN_HEIGHT;
+
+      const cropped = await manipulateAsync(
+        photo.uri,
+        [{
+          crop: {
+            originX: Math.round(photo.width * xFrac),
+            originY: Math.round(photo.height * yFrac),
+            width: Math.round(photo.width * wFrac),
+            height: Math.round(photo.height * hFrac),
+          },
+        }],
+        { format: SaveFormat.JPEG },
+      );
+      onCaptured(cropped.uri);
     } finally {
       setCapturing(false);
     }
@@ -55,17 +86,15 @@ export default function DocumentCameraScreen({ onCancel, onCaptured, accentColor
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
-      <View style={styles.overlay} pointerEvents="none">
-        <View style={styles.dim} />
-        <View style={styles.frameRow}>
-          <View style={styles.dim} />
-          <View style={[styles.frame, { width: FRAME_WIDTH, height: FRAME_HEIGHT, borderColor: accentColor }]} />
-          <View style={styles.dim} />
-        </View>
-        <View style={styles.dim} />
+      <View pointerEvents="none">
+        <View style={[styles.dim, { top: 0, left: 0, right: 0, height: frameTop }]} />
+        <View style={[styles.dim, { top: frameTop + frameHeight, left: 0, right: 0, height: SCREEN_HEIGHT - frameTop - frameHeight }]} />
+        <View style={[styles.dim, { top: frameTop, left: 0, width: frameLeft, height: frameHeight }]} />
+        <View style={[styles.dim, { top: frameTop, left: frameLeft + frameWidth, right: 0, height: frameHeight }]} />
+        <View style={[styles.frame, { top: frameTop, left: frameLeft, width: frameWidth, height: frameHeight, borderColor: accentColor }]} />
       </View>
 
-      <Text style={[styles.hint, { top: insets.top + spacing.lg }]}>Encaixe o documento (A4) dentro da moldura</Text>
+      <Text style={[styles.hint, { top: insets.top + spacing.lg }]}>Encaixe o documento na moldura, o mais próximo possível</Text>
 
       <View style={[styles.controls, { paddingBottom: insets.bottom + spacing.lg }]}>
         <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={capturing}>
@@ -82,10 +111,8 @@ export default function DocumentCameraScreen({ onCancel, onCaptured, accentColor
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  overlay: { ...StyleSheet.absoluteFill, flexDirection: 'column' },
-  dim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  frameRow: { flexDirection: 'row' },
-  frame: { borderWidth: 3, borderRadius: 12, backgroundColor: 'transparent' },
+  dim: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.55)' },
+  frame: { position: 'absolute', borderWidth: 3, borderRadius: 12, backgroundColor: 'transparent' },
   hint: {
     position: 'absolute',
     alignSelf: 'center',
