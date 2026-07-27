@@ -59,21 +59,23 @@ export default function DocumentCameraScreen({ onCancel, onCaptured, accentColor
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (!photo?.uri) return;
 
-      const xFrac = frameLeft / SCREEN_WIDTH;
-      const yFrac = frameTop / SCREEN_HEIGHT;
-      const wFrac = frameWidth / SCREEN_WIDTH;
-      const hFrac = frameHeight / SCREEN_HEIGHT;
+      // CameraView preenche a tela em modo "cover": a foto capturada quase sempre
+      // tem proporção diferente da tela (ex: sensor 4:3 numa tela 9:19.5), então
+      // o preview mostra só um recorte central da foto. Convertemos a moldura
+      // (em coordenadas de tela) para coordenadas da foto real replicando esse
+      // recorte de "cover", em vez de assumir que a foto tem a proporção da tela.
+      const coverScale = Math.max(SCREEN_WIDTH / photo.width, SCREEN_HEIGHT / photo.height);
+      const offsetX = (photo.width * coverScale - SCREEN_WIDTH) / 2;
+      const offsetY = (photo.height * coverScale - SCREEN_HEIGHT) / 2;
+
+      const originX = Math.max(0, Math.round((frameLeft + offsetX) / coverScale));
+      const originY = Math.max(0, Math.round((frameTop + offsetY) / coverScale));
+      const width = Math.min(photo.width - originX, Math.round(frameWidth / coverScale));
+      const height = Math.min(photo.height - originY, Math.round(frameHeight / coverScale));
 
       const cropped = await manipulateAsync(
         photo.uri,
-        [{
-          crop: {
-            originX: Math.round(photo.width * xFrac),
-            originY: Math.round(photo.height * yFrac),
-            width: Math.round(photo.width * wFrac),
-            height: Math.round(photo.height * hFrac),
-          },
-        }],
+        [{ crop: { originX, originY, width, height } }],
         { format: SaveFormat.JPEG },
       );
       onCaptured(cropped.uri);
