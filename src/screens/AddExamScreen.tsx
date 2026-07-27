@@ -13,10 +13,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { uploadMyExam } from '../services/patient.service';
+import { analyzeMyExam, uploadMyExam } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 interface PickedFile {
@@ -37,12 +38,29 @@ function formatDateLabel(iso: string) {
 const TYPES = ['Exame', 'Receita', 'Atestado', 'Outro documento'];
 
 export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
+  const insets = useSafeAreaInsets();
   const [examType, setExamType] = useState('');
   const [date, setDate] = useState(formatDate(new Date()));
   const [observations, setObservations] = useState('');
   const [file, setFile] = useState<PickedFile | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
+
+  async function analyze(picked: PickedFile) {
+    setAnalyzing(true);
+    try {
+      const result = await analyzeMyExam(picked);
+      if (result.exam_type) setExamType(result.exam_type);
+      if (result.exam_date) setDate(result.exam_date);
+      if (result.observations) setObservations(result.observations);
+    } catch {
+      Alert.alert('IA indisponível', 'Não foi possível analisar o documento automaticamente. Preencha os dados manualmente.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -56,7 +74,9 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setFile({ uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' });
+      const picked = { uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' };
+      setFile(picked);
+      analyze(picked);
     }
   }
 
@@ -69,7 +89,9 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setFile({ uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' });
+      const picked = { uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' };
+      setFile(picked);
+      analyze(picked);
     }
   }
 
@@ -77,8 +99,17 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'] });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/pdf' });
+      const picked = { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/pdf' };
+      setFile(picked);
+      analyze(picked);
     }
+  }
+
+  function handleDiscard() {
+    setFile(null);
+    setExamType('');
+    setObservations('');
+    setDate(formatDate(new Date()));
   }
 
   async function handleSubmit() {
@@ -90,14 +121,17 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     setSaving(true);
     try {
       await uploadMyExam({ exam_type: examType, exam_date: date, observations: observations || undefined, file });
-      Alert.alert('Enviado', 'Seu documento foi enviado com sucesso.');
-      onSaved();
+      setSentCount((c) => c + 1);
+      handleDiscard();
+      Alert.alert('Enviado', 'Documento registrado. Você já pode enviar o próximo.');
     } catch {
       Alert.alert('Erro', 'Não foi possível enviar o documento. Tente novamente.');
     } finally {
       setSaving(false);
     }
   }
+
+  const pickersDisabled = !!file || analyzing;
 
   return (
     <View style={styles.container}>
@@ -114,8 +148,52 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
       </View>
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.subtitle}>Exame, receita ou atestado — envia direto, sem precisar de aprovação.</Text>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.subtitle}>
+          Tire a foto — a IA identifica o tipo e a data automaticamente. Confirme e envie para liberar o próximo documento.
+          {sentCount > 0 ? `\nEnviados nesta sessão: ${sentCount}` : ''}
+        </Text>
+
+        <View style={styles.pickButtonRow}>
+          <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={handleTakePhoto} activeOpacity={0.75} disabled={pickersDisabled}>
+            <Text style={styles.pickButtonText}>📷 Foto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={handlePickImage} activeOpacity={0.75} disabled={pickersDisabled}>
+            <Text style={styles.pickButtonText}>🖼️ Galeria</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={handlePickDocument} activeOpacity={0.75} disabled={pickersDisabled}>
+            <Text style={styles.pickButtonText}>📄 PDF</Text>
+          </TouchableOpacity>
+        </View>
+
+        {file ? (
+          <View style={styles.previewWrap}>
+            {file.mimeType.startsWith('image') ? (
+              <Image source={{ uri: file.uri }} style={styles.preview} resizeMode="cover" />
+            ) : (
+              <View style={styles.filePreview}>
+                <Text style={styles.filePreviewIcon}>📄</Text>
+                <Text style={styles.filePreviewName} numberOfLines={1}>{file.name}</Text>
+              </View>
+            )}
+            {analyzing && (
+              <View style={styles.analyzingOverlay}>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.analyzingText}>Analisando com IA...</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.discardButton} onPress={handleDiscard} disabled={analyzing || saving}>
+              <Text style={styles.discardButtonText}>🗑️ Descartar e tirar outra foto</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.previewPlaceholder}>
+            <Text style={styles.muted}>Nenhum arquivo anexado ainda.</Text>
+          </View>
+        )}
 
         <View style={styles.chipRow}>
           {TYPES.map((t) => (
@@ -128,6 +206,14 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
             </TouchableOpacity>
           ))}
         </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Tipo do documento (preenchido pela IA)"
+          placeholderTextColor={colors.hint}
+          value={examType}
+          onChangeText={setExamType}
+        />
 
         <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)} activeOpacity={0.75}>
           <Text style={styles.pickerValue}>{`📅 ${formatDateLabel(date)}`}</Text>
@@ -154,35 +240,8 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
           multiline
         />
 
-        {file ? (
-          file.mimeType.startsWith('image') ? (
-            <Image source={{ uri: file.uri }} style={styles.preview} resizeMode="cover" />
-          ) : (
-            <View style={styles.filePreview}>
-              <Text style={styles.filePreviewIcon}>📄</Text>
-              <Text style={styles.filePreviewName} numberOfLines={1}>{file.name}</Text>
-            </View>
-          )
-        ) : (
-          <View style={styles.previewPlaceholder}>
-            <Text style={styles.muted}>Nenhum arquivo anexado ainda.</Text>
-          </View>
-        )}
-
-        <View style={styles.pickButtonRow}>
-          <TouchableOpacity style={styles.pickButton} onPress={handleTakePhoto} activeOpacity={0.75}>
-            <Text style={styles.pickButtonText}>📷 Foto</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pickButton} onPress={handlePickImage} activeOpacity={0.75}>
-            <Text style={styles.pickButtonText}>🖼️ Galeria</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pickButton} onPress={handlePickDocument} activeOpacity={0.75}>
-            <Text style={styles.pickButtonText}>📄 PDF</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar</Text>}
+        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving || analyzing || !file}>
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Registrar e enviar</Text>}
         </TouchableOpacity>
       </ScrollView>
       </KeyboardAvoidingView>
@@ -254,12 +313,27 @@ const styles = StyleSheet.create({
   },
   pickerValue: { fontSize: typography.body, color: colors.text, fontWeight: '600' },
   notesInput: { height: buttonHeight * 1.5, paddingTop: spacing.md, textAlignVertical: 'top' },
+  previewWrap: { marginBottom: spacing.md },
   preview: {
     width: '100%',
     height: 220,
     borderRadius: 12,
-    marginBottom: spacing.md,
   },
+  analyzingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  analyzingText: { color: '#fff', fontWeight: '600' },
+  discardButton: { alignItems: 'center', paddingVertical: spacing.sm },
+  discardButtonText: { color: colors.red, fontWeight: '700', fontSize: typography.label },
   previewPlaceholder: {
     height: 100,
     borderRadius: 12,
@@ -279,7 +353,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
   },
   filePreviewIcon: { fontSize: 32, marginBottom: 4 },
@@ -295,6 +368,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pickButtonDisabled: { opacity: 0.4 },
   pickButtonText: { color: colors.green, fontWeight: '700', fontSize: typography.label },
   button: {
     backgroundColor: colors.green,

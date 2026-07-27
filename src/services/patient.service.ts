@@ -136,6 +136,24 @@ export function uploadMyExam(data: NewExamInput): Promise<void> {
   return api.upload('/me/exams', formData);
 }
 
+export interface OcrResult {
+  exam_type: string | null;
+  exam_date: string | null;
+  lab_name: string | null;
+  observations: string | null;
+  structured_data: Record<string, string> | null;
+}
+
+export function analyzeMyExam(file: { uri: string; name: string; mimeType: string }): Promise<OcrResult> {
+  const formData = new FormData();
+  formData.append('image', {
+    uri: file.uri,
+    name: file.name,
+    type: file.mimeType,
+  } as unknown as Blob);
+  return api.upload<OcrResult>('/me/exams/analyze', formData);
+}
+
 export function getMyExams(): Promise<ExamResult[]> {
   return api.get<ExamResult[]>('/me/exams');
 }
