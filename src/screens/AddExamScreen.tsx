@@ -18,6 +18,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { analyzeMyExam, uploadMyExam } from '../services/patient.service';
+import { resizeForUpload } from '../utils/image';
+import DocumentCameraScreen from './DocumentCameraScreen';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 interface PickedFile {
@@ -43,10 +45,13 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
   const [date, setDate] = useState(formatDate(new Date()));
   const [observations, setObservations] = useState('');
   const [file, setFile] = useState<PickedFile | null>(null);
+  const [labName, setLabName] = useState<string | null>(null);
+  const [structuredData, setStructuredData] = useState<Record<string, string> | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [sentCount, setSentCount] = useState(0);
+  const [showCamera, setShowCamera] = useState(false);
 
   async function analyze(picked: PickedFile) {
     setAnalyzing(true);
@@ -55,8 +60,11 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
       if (result.exam_type) setExamType(result.exam_type);
       if (result.exam_date) setDate(result.exam_date);
       if (result.observations) setObservations(result.observations);
-    } catch {
-      Alert.alert('IA indisponível', 'Não foi possível analisar o documento automaticamente. Preencha os dados manualmente.');
+      setLabName(result.lab_name ?? null);
+      setStructuredData(result.structured_data ?? null);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      Alert.alert('IA indisponível', `Não foi possível analisar o documento automaticamente. Preencha os dados manualmente.\n\n(${detail})`);
     } finally {
       setAnalyzing(false);
     }
@@ -74,25 +82,17 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      const picked = { uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' };
+      const picked = await resizeForUpload(asset.uri);
       setFile(picked);
       analyze(picked);
     }
   }
 
-  async function handleTakePhoto() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permissão necessária', 'Precisamos de acesso à câmera para fotografar o documento.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const picked = { uri: asset.uri, name: asset.fileName ?? `foto_${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' };
-      setFile(picked);
-      analyze(picked);
-    }
+  async function handleCaptured(uri: string) {
+    setShowCamera(false);
+    const picked = await resizeForUpload(uri);
+    setFile(picked);
+    analyze(picked);
   }
 
   async function handlePickDocument() {
@@ -110,6 +110,8 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
     setExamType('');
     setObservations('');
     setDate(formatDate(new Date()));
+    setLabName(null);
+    setStructuredData(null);
   }
 
   async function handleSubmit() {
@@ -120,7 +122,7 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
 
     setSaving(true);
     try {
-      await uploadMyExam({ exam_type: examType, exam_date: date, observations: observations || undefined, file });
+      await uploadMyExam({ exam_type: examType, exam_date: date, observations: observations || undefined, lab_name: labName, structured_data: structuredData, file });
       setSentCount((c) => c + 1);
       handleDiscard();
       Alert.alert('Enviado', 'Documento registrado. Você já pode enviar o próximo.');
@@ -132,6 +134,10 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
   }
 
   const pickersDisabled = !!file || analyzing;
+
+  if (showCamera) {
+    return <DocumentCameraScreen onCancel={() => setShowCamera(false)} onCaptured={handleCaptured} accentColor={colors.green} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -158,7 +164,7 @@ export default function AddExamScreen({ onBack, onSaved }: { onBack: () => void;
         </Text>
 
         <View style={styles.pickButtonRow}>
-          <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={handleTakePhoto} activeOpacity={0.75} disabled={pickersDisabled}>
+          <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={() => setShowCamera(true)} activeOpacity={0.75} disabled={pickersDisabled}>
             <Text style={styles.pickButtonText}>📷 Foto</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.pickButton, pickersDisabled && styles.pickButtonDisabled]} onPress={handlePickImage} activeOpacity={0.75} disabled={pickersDisabled}>

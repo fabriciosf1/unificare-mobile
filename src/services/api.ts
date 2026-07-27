@@ -74,6 +74,20 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+// RN Nova Arquitetura (Expo SDK 52+/RN 0.74+) quebrou o atalho clássico
+// formData.append('x', { uri, name, type }) para arquivos — lança
+// "Unsupported FormDataPart implementation". Convertendo para Blob real
+// via fetch(uri) antes de anexar funciona nas duas arquiteturas.
+async function appendFilePart(
+  formData: FormData,
+  fieldName: string,
+  file: { uri: string; name: string; mimeType: string },
+): Promise<void> {
+  const response = await fetch(file.uri);
+  const blob = await response.blob();
+  formData.append(fieldName, blob, file.name);
+}
+
 async function downloadAndOpen(path: string, fileName: string): Promise<void> {
   const token = await getToken();
   const destination = new File(Paths.cache, fileName);
@@ -99,5 +113,6 @@ export const api = {
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, formData: FormData) => upload<T>(path, formData),
+  appendFilePart,
   downloadAndOpen,
 };

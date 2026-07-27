@@ -75,6 +75,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "O UnifCare usa a câmera para fotografar seus documentos e exames."
+        }
+      ],
+      [
         "react-native-notify-kit",
         {
           "android": {

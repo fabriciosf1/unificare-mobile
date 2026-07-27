@@ -151,19 +151,19 @@ export interface NewExamInput {
   exam_type: string;
   exam_date: string;
   observations?: string;
+  lab_name?: string | null;
+  structured_data?: Record<string, string> | null;
   file: { uri: string; name: string; mimeType: string };
 }
 
-export function uploadFamilyExam(data: NewExamInput): Promise<void> {
+export async function uploadFamilyExam(data: NewExamInput): Promise<void> {
   const formData = new FormData();
   formData.append('exam_type', data.exam_type);
   formData.append('exam_date', data.exam_date);
   if (data.observations) formData.append('observations', data.observations);
-  formData.append('file', {
-    uri: data.file.uri,
-    name: data.file.name,
-    type: data.file.mimeType,
-  } as unknown as Blob);
+  if (data.lab_name) formData.append('lab_name', data.lab_name);
+  if (data.structured_data) formData.append('structured_data', JSON.stringify(data.structured_data));
+  await api.appendFilePart(formData, 'file', data.file);
   return api.upload('/family/exams', formData);
 }
 
@@ -175,13 +175,9 @@ export interface OcrResult {
   structured_data: Record<string, string> | null;
 }
 
-export function analyzeFamilyExam(file: { uri: string; name: string; mimeType: string }): Promise<OcrResult> {
+export async function analyzeFamilyExam(file: { uri: string; name: string; mimeType: string }): Promise<OcrResult> {
   const formData = new FormData();
-  formData.append('image', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType,
-  } as unknown as Blob);
+  await api.appendFilePart(formData, 'image', file);
   return api.upload<OcrResult>('/family/exams/analyze', formData);
 }
 
