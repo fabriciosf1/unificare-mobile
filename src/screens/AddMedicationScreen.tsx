@@ -32,12 +32,15 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState('');
   const [scheduleTimes, setScheduleTimes] = useState<string[]>([]);
+  const [medType, setMedType] = useState<'continuous' | 'period'>('continuous');
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const [showNamePicker, setShowNamePicker] = useState(false);
   const [nameFilter, setNameFilter] = useState('');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   useEffect(() => {
     getDrugCatalog()
@@ -79,6 +82,10 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       Alert.alert('Atenção', 'Selecione o remédio, a dosagem, a frequência e ao menos um horário.');
       return;
     }
+    if (medType === 'period' && !endDate) {
+      Alert.alert('Atenção', 'Informe até quando o remédio deve ser usado.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -86,8 +93,10 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         name: selectedDrug.name,
         dosage,
         frequency,
+        type: medType,
         schedule_times: scheduleTimes,
         start_date: new Date().toISOString().slice(0, 10),
+        end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
         notes: notes || undefined,
       });
       Alert.alert('Enviado', 'Seu remédio foi cadastrado e aguarda aprovação da sua família.');
@@ -194,6 +203,44 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
           onChange={(event, selected) => {
             setShowTimePicker(false);
             if (event.type === 'set' && selected) handleAddTime(selected);
+          }}
+        />
+      )}
+
+      <View style={styles.chipSection}>
+        <Text style={styles.sectionLabel}>Duração do uso</Text>
+        <View style={styles.chipRow}>
+          <TouchableOpacity
+            style={[styles.chip, medType === 'continuous' && styles.chipActive]}
+            onPress={() => { setMedType('continuous'); setEndDate(null); }}
+          >
+            <Text style={[styles.chipText, medType === 'continuous' && styles.chipTextActive]}>Uso contínuo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, medType === 'period' && styles.chipActive]}
+            onPress={() => setMedType('period')}
+          >
+            <Text style={[styles.chipText, medType === 'period' && styles.chipTextActive]}>Por período</Text>
+          </TouchableOpacity>
+        </View>
+        {medType === 'period' && (
+          <TouchableOpacity style={[styles.input, { marginTop: spacing.sm }]} onPress={() => setShowEndDatePicker(true)}>
+            <Text style={endDate ? styles.pickerValue : styles.pickerPlaceholder}>
+              {endDate ? `Usar até ${endDate.toLocaleDateString('pt-BR')}` : '📅 Selecionar data final'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={endDate ?? new Date()}
+          mode="date"
+          display="calendar"
+          minimumDate={new Date()}
+          onChange={(event, selected) => {
+            setShowEndDatePicker(false);
+            if (event.type === 'set' && selected) setEndDate(selected);
           }}
         />
       )}

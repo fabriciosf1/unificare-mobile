@@ -42,6 +42,9 @@ export interface Medication {
   name: string;
   dosage: string;
   frequency: string;
+  type: 'continuous' | 'period';
+  start_date?: string;
+  end_date?: string | null;
   schedule_times: string[];
   today_adherence: 'taken' | 'pending' | 'missed' | 'late';
   today_doses: MedicationDose[];

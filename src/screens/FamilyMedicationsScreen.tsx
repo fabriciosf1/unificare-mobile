@@ -140,6 +140,11 @@ export default function FamilyMedicationsScreen({
               <View style={styles.cardHeaderText}>
                 <Text style={styles.medName}>{med.name}</Text>
                 <Text style={styles.medDosage}>{med.dosage} • {med.frequency}</Text>
+                <Text style={styles.medDuration}>
+                  {med.type === 'period' && med.end_date
+                    ? `Uso até ${new Date(med.end_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`
+                    : 'Uso contínuo'}
+                </Text>
               </View>
               <View style={styles.cardActions}>
                 <TouchableOpacity
@@ -284,7 +289,8 @@ const styles = StyleSheet.create({
   },
   cardActionText: { fontSize: 15 },
   medName: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text },
-  medDosage: { fontSize: 14, color: colors.muted, marginTop: 2, marginBottom: spacing.sm },
+  medDosage: { fontSize: 14, color: colors.muted, marginTop: 2 },
+  medDuration: { fontSize: 12, color: colors.hint, marginTop: 2, marginBottom: spacing.sm },
   pendingLabel: { color: colors.yellow, fontWeight: '700', fontSize: 14 },
   doseRow: {
     flexDirection: 'row',

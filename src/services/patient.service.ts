@@ -52,8 +52,10 @@ export interface NewMedicationInput {
   name: string;
   dosage: string;
   frequency: string;
+  type: 'continuous' | 'period';
   schedule_times: string[];
   start_date: string;
+  end_date?: string;
   notes?: string;
 }
 

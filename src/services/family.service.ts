@@ -109,8 +109,10 @@ export interface NewMedicationInput {
   name: string;
   dosage: string;
   frequency: string;
+  type: 'continuous' | 'period';
   schedule_times: string[];
   start_date: string;
+  end_date?: string;
   notes?: string;
 }
 
@@ -122,7 +124,9 @@ export interface UpdateMedicationInput {
   name?: string;
   dosage?: string;
   frequency?: string;
+  type?: 'continuous' | 'period';
   schedule_times?: string[];
+  end_date?: string;
   notes?: string;
 }
 
