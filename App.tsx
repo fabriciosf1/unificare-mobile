@@ -22,6 +22,7 @@ import AlertsHistoryScreen from './src/screens/AlertsHistoryScreen';
 import AddMedicationScreen from './src/screens/AddMedicationScreen';
 import AddAppointmentScreen from './src/screens/AddAppointmentScreen';
 import AddExamScreen from './src/screens/AddExamScreen';
+import EditExamScreen from './src/screens/EditExamScreen';
 import ExamsScreen from './src/screens/ExamsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FamiliaresScreen from './src/screens/FamiliaresScreen';
@@ -30,16 +31,17 @@ import FamilyProfileScreen from './src/screens/FamilyProfileScreen';
 import FamilyAlertsScreen from './src/screens/FamilyAlertsScreen';
 import FamilyMedicationsScreen from './src/screens/FamilyMedicationsScreen';
 import FamilyAddExamScreen from './src/screens/FamilyAddExamScreen';
+import FamilyEditExamScreen from './src/screens/FamilyEditExamScreen';
 import FamilyExamsScreen from './src/screens/FamilyExamsScreen';
 import FamilyAddMedicationScreen from './src/screens/FamilyAddMedicationScreen';
 import FamilyAddAppointmentScreen from './src/screens/FamilyAddAppointmentScreen';
 import SosCameraScreen from './src/screens/SosCameraScreen';
 import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
-import type { Medication } from './src/types';
+import type { ExamResult, Medication } from './src/types';
 
-type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'sosCamera' | 'profile' | 'familiares';
-type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
+type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares';
+type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
@@ -73,6 +75,7 @@ export default function App() {
   const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('home');
   const [sosCall, setSosCall] = useState<SosCallData | null>(null);
   const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
+  const [editingExam, setEditingExam] = useState<ExamResult | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const roleRef = useRef<AppRole | null>(null);
 
@@ -280,6 +283,10 @@ export default function App() {
           case 'addExam':
             setFamilyScreen('exams');
             return true;
+          case 'editExam':
+            setEditingExam(null);
+            setFamilyScreen('exams');
+            return true;
           case 'watchSos':
             setSosCall(null);
             setFamilyScreen('home');
@@ -295,6 +302,10 @@ export default function App() {
           case 'home':
             return false;
           case 'addExam':
+            setPatientScreen('exams');
+            return true;
+          case 'editExam':
+            setEditingExam(null);
             setPatientScreen('exams');
             return true;
           case 'sosCamera':
@@ -397,10 +408,30 @@ export default function App() {
         <FamilyAddAppointmentScreen onBack={() => setFamilyScreen('home')} onSaved={() => setFamilyScreen('home')} />
       )}
       {loggedIn && role === 'family' && familyScreen === 'exams' && (
-        <FamilyExamsScreen onBack={() => setFamilyScreen('home')} onAddExam={() => setFamilyScreen('addExam')} />
+        <FamilyExamsScreen
+          onBack={() => setFamilyScreen('home')}
+          onAddExam={() => setFamilyScreen('addExam')}
+          onEditExam={(exam) => {
+            setEditingExam(exam);
+            setFamilyScreen('editExam');
+          }}
+        />
       )}
       {loggedIn && role === 'family' && familyScreen === 'addExam' && (
         <FamilyAddExamScreen onBack={() => setFamilyScreen('exams')} onSaved={() => setFamilyScreen('exams')} />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'editExam' && editingExam && (
+        <FamilyEditExamScreen
+          exam={editingExam}
+          onBack={() => {
+            setEditingExam(null);
+            setFamilyScreen('exams');
+          }}
+          onSaved={() => {
+            setEditingExam(null);
+            setFamilyScreen('exams');
+          }}
+        />
       )}
       {loggedIn && role === 'family' && familyScreen === 'watchSos' && sosCall && (
         <WatchSosScreen
@@ -442,10 +473,30 @@ export default function App() {
         <AddAppointmentScreen onBack={() => setPatientScreen('home')} onSaved={() => setPatientScreen('home')} />
       )}
       {loggedIn && role === 'patient' && patientScreen === 'exams' && (
-        <ExamsScreen onBack={() => setPatientScreen('home')} onAddExam={() => setPatientScreen('addExam')} />
+        <ExamsScreen
+          onBack={() => setPatientScreen('home')}
+          onAddExam={() => setPatientScreen('addExam')}
+          onEditExam={(exam) => {
+            setEditingExam(exam);
+            setPatientScreen('editExam');
+          }}
+        />
       )}
       {loggedIn && role === 'patient' && patientScreen === 'addExam' && (
         <AddExamScreen onBack={() => setPatientScreen('exams')} onSaved={() => setPatientScreen('exams')} />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'editExam' && editingExam && (
+        <EditExamScreen
+          exam={editingExam}
+          onBack={() => {
+            setEditingExam(null);
+            setPatientScreen('exams');
+          }}
+          onSaved={() => {
+            setEditingExam(null);
+            setPatientScreen('exams');
+          }}
+        />
       )}
       {loggedIn && role === 'patient' && patientScreen === 'sosCamera' && sosCall && (
         <SosCameraScreen patientId={sosCall.patientId} onClose={() => setPatientScreen('home')} />

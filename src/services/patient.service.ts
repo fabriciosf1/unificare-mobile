@@ -153,3 +153,18 @@ export function getMyExams(): Promise<ExamResult[]> {
 export function openMyExam(exam: ExamResult): Promise<void> {
   return api.downloadAndOpen(`/me/exams/${exam.uuid}/view`, exam.file_name ?? `${exam.exam_type}.jpg`);
 }
+
+export interface ExamUpdateInput {
+  exam_type?: string;
+  exam_date?: string;
+  lab_name?: string | null;
+  observations?: string | null;
+}
+
+export function updateMyExam(uuid: string, data: ExamUpdateInput): Promise<ExamResult> {
+  return api.put<ExamResult>(`/me/exams/${uuid}`, data);
+}
+
+export function deleteMyExam(uuid: string): Promise<void> {
+  return api.delete(`/me/exams/${uuid}`);
+}

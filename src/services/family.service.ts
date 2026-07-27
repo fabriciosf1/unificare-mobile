@@ -188,3 +188,18 @@ export function getFamilyExams(): Promise<ExamResult[]> {
 export function openFamilyExam(exam: ExamResult): Promise<void> {
   return api.downloadAndOpen(`/family/exams/${exam.uuid}/view`, exam.file_name ?? `${exam.exam_type}.jpg`);
 }
+
+export interface ExamUpdateInput {
+  exam_type?: string;
+  exam_date?: string;
+  lab_name?: string | null;
+  observations?: string | null;
+}
+
+export function updateFamilyExam(uuid: string, data: ExamUpdateInput): Promise<ExamResult> {
+  return api.put<ExamResult>(`/family/exams/${uuid}`, data);
+}
+
+export function deleteFamilyExam(uuid: string): Promise<void> {
+  return api.delete(`/family/exams/${uuid}`);
+}

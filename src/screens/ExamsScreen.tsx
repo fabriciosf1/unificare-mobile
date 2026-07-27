@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getMyExams, openMyExam } from '../services/patient.service';
+import { ActivityIndicator, Alert, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { deleteMyExam, getMyExams, openMyExam } from '../services/patient.service';
 import type { ExamResult } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
@@ -15,10 +15,19 @@ function sourceLabel(source: ExamResult['source']) {
   return 'Você';
 }
 
-export default function ExamsScreen({ onBack, onAddExam }: { onBack: () => void; onAddExam: () => void }) {
+export default function ExamsScreen({
+  onBack,
+  onAddExam,
+  onEditExam,
+}: {
+  onBack: () => void;
+  onAddExam: () => void;
+  onEditExam: (exam: ExamResult) => void;
+}) {
   const [exams, setExams] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingUuid, setOpeningUuid] = useState<string | null>(null);
+  const [deletingUuid, setDeletingUuid] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -40,6 +49,27 @@ export default function ExamsScreen({ onBack, onAddExam }: { onBack: () => void;
     } finally {
       setOpeningUuid(null);
     }
+  }
+
+  function handleDelete(exam: ExamResult) {
+    Alert.alert('Excluir documento', `Deseja excluir "${exam.exam_type}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingUuid(exam.uuid);
+          try {
+            await deleteMyExam(exam.uuid);
+            load();
+          } catch {
+            Alert.alert('Erro', 'Não foi possível excluir o documento. Tente novamente.');
+          } finally {
+            setDeletingUuid(null);
+          }
+        },
+      },
+    ]);
   }
 
   return (
@@ -73,7 +103,30 @@ export default function ExamsScreen({ onBack, onAddExam }: { onBack: () => void;
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>{item.exam_type}</Text>
-                <Text style={styles.cardSource}>{sourceLabel(item.source)}</Text>
+                <View style={styles.cardActions}>
+                  <Text style={styles.cardSource}>{sourceLabel(item.source)}</Text>
+                  <TouchableOpacity
+                    style={styles.cardActionButton}
+                    onPress={() => onEditExam(item)}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.cardActionText}>✏️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cardActionButton}
+                    onPress={() => handleDelete(item)}
+                    disabled={deletingUuid === item.uuid}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    {deletingUuid === item.uuid ? (
+                      <ActivityIndicator size="small" color={colors.red} />
+                    ) : (
+                      <Text style={styles.cardActionText}>🗑️</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={styles.cardMeta}>{formatDateLabel(item.exam_date)}</Text>
               {item.observations ? <Text style={styles.cardObservations}>{item.observations}</Text> : null}
@@ -154,7 +207,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: typography.label, fontWeight: '700', color: colors.text },
+  cardTitle: { fontSize: typography.label, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardActionButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardActionText: { fontSize: 14 },
   cardSource: { fontSize: 13, color: colors.muted, fontWeight: '600' },
   cardMeta: { fontSize: 14, color: colors.muted, marginTop: 4 },
   cardObservations: { fontSize: 14, color: colors.text, marginTop: spacing.sm },
