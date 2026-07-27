@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteFamilyMedication, getFamilyMedicationsToday, logFamilyMedication } from '../services/family.service';
 import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -31,6 +32,7 @@ export default function FamilyMedicationsScreen({
   const [error, setError] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
     const data = await getFamilyMedicationsToday();
@@ -110,7 +112,7 @@ export default function FamilyMedicationsScreen({
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {loading && (

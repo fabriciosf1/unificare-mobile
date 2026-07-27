@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { updateMyPassword } from '../services/patient.service';
 import { familyUpdatePassword } from '../services/family.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -36,6 +37,7 @@ export default function ChangePasswordScreen({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const theme = ROLE_THEME[role];
+  const insets = useSafeAreaInsets();
 
   async function handleSave() {
     if (!newPassword || newPassword.length < 8) {
@@ -70,7 +72,7 @@ export default function ChangePasswordScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}
       >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <View style={styles.brandBlock}>
           <LinearGradient
             colors={theme.gradient}

@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { familyForgotPassword } from '../services/auth.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
@@ -19,6 +20,7 @@ export default function ForgotPasswordScreen({ onBack }: { onBack: () => void })
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const insets = useSafeAreaInsets();
 
   async function handleSubmit() {
     if (!email) return;
@@ -37,7 +39,7 @@ export default function ForgotPasswordScreen({ onBack }: { onBack: () => void })
   return (
     <LinearGradient colors={[colors.blueDark, colors.blue, colors.blueLight]} style={styles.gradient}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
           <View style={styles.brandBlock}>
             <View style={styles.logoWrap}>
               <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />

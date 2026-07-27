@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFamilyDrugCatalog, createFamilyMedication, updateFamilyMedication } from '../services/family.service';
 import type { Drug } from '../services/patient.service';
 import type { Medication } from '../types';
@@ -52,6 +53,7 @@ export default function FamilyAddMedicationScreen({
   const [nameFilter, setNameFilter] = useState('');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (isEdit) return;
@@ -153,7 +155,7 @@ export default function FamilyAddMedicationScreen({
       </View>
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>
         {isEdit ? 'Altera a dosagem, frequência, horários ou observações.' : 'Cadastra direto para o paciente, sem precisar de aprovação.'}
       </Text>
@@ -308,7 +310,7 @@ export default function FamilyAddMedicationScreen({
       </TouchableOpacity>
 
       <Modal visible={!isEdit && showNamePicker} animationType="slide" onRequestClose={() => setShowNamePicker(false)}>
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { paddingBottom: spacing.lg + insets.bottom }]}>
           <Text style={styles.title}>Selecionar remédio</Text>
           <TextInput
             style={styles.input}
@@ -318,6 +320,7 @@ export default function FamilyAddMedicationScreen({
             onChangeText={setNameFilter}
           />
           <FlatList
+            style={styles.drugList}
             data={filteredDrugs}
             keyExtractor={(item) => item.uuid}
             renderItem={({ item }) => (
@@ -426,6 +429,7 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontSize: typography.subtitle, fontWeight: '700' },
   modalContainer: { flex: 1, backgroundColor: colors.blueSurface, padding: spacing.lg, paddingTop: spacing.xl },
+  drugList: { flex: 1 },
   modalCancel: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,

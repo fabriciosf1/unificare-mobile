@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteFamilyExam, getFamilyExams, openFamilyExam } from '../services/family.service';
 import type { ExamResult } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -28,6 +29,7 @@ export default function FamilyExamsScreen({
   const [loading, setLoading] = useState(true);
   const [openingUuid, setOpeningUuid] = useState<string | null>(null);
   const [deletingUuid, setDeletingUuid] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -97,7 +99,7 @@ export default function FamilyExamsScreen({
         <FlatList
           data={exams}
           keyExtractor={(item) => item.uuid}
-          contentContainerStyle={{ padding: spacing.lg }}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.lg + insets.bottom }}
           ListEmptyComponent={<Text style={styles.muted}>Nenhum documento enviado ainda.</Text>}
           renderItem={({ item }) => (
             <View style={styles.card}>

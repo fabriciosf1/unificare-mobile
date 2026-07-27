@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyAlerts } from '../services/patient.service';
 import type { AlertEvent } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -7,6 +8,7 @@ import { colors, spacing, typography, buttonHeight } from '../theme';
 export default function AlertsHistoryScreen({ onBack }: { onBack: () => void }) {
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     getMyAlerts()
@@ -34,7 +36,7 @@ export default function AlertsHistoryScreen({ onBack }: { onBack: () => void }) 
         <FlatList
           data={alerts}
           keyExtractor={(item) => item.uuid}
-          contentContainerStyle={{ padding: spacing.lg }}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.lg + insets.bottom }}
           ListEmptyComponent={<Text style={styles.muted}>Nenhum alerta registrado.</Text>}
           renderItem={({ item }) => (
             <View

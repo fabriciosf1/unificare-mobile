@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyContacts } from '../services/patient.service';
 import type { PatientContact } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -20,6 +21,7 @@ export default function FamiliaresScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
     const data = await getMyContacts();
@@ -55,7 +57,7 @@ export default function FamiliaresScreen({ onBack }: { onBack: () => void }) {
 
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {loading && (

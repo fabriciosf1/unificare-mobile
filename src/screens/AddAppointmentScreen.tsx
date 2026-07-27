@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { requestAppointment } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
@@ -47,6 +48,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const insets = useSafeAreaInsets();
 
   async function handleSubmit() {
     if (!date || !time) {
@@ -88,7 +90,7 @@ export default function AddAppointmentScreen({ onBack, onSaved }: { onBack: () =
       </View>
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Fica pendente de aprovação da sua família antes de valer.</Text>
 
       <View style={styles.typeRow}>

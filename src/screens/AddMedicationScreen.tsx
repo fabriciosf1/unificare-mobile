@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDrugCatalog, requestMedication, type Drug } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
@@ -41,6 +42,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   const [nameFilter, setNameFilter] = useState('');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     getDrugCatalog()
@@ -125,7 +127,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       </View>
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Fica pendente de aprovação da sua família antes de valer.</Text>
 
       <TouchableOpacity style={styles.input} onPress={() => setShowNamePicker(true)} activeOpacity={0.75} disabled={loadingDrugs}>
@@ -259,7 +261,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       </TouchableOpacity>
 
       <Modal visible={showNamePicker} animationType="slide" onRequestClose={() => setShowNamePicker(false)}>
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { paddingBottom: spacing.lg + insets.bottom }]}>
           <Text style={styles.title}>Selecionar remédio</Text>
           <TextInput
             style={styles.input}
@@ -269,6 +271,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
             onChangeText={setNameFilter}
           />
           <FlatList
+            style={styles.drugList}
             data={filteredDrugs}
             keyExtractor={(item) => item.uuid}
             renderItem={({ item }) => (
@@ -377,6 +380,7 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontSize: typography.subtitle, fontWeight: '700' },
   modalContainer: { flex: 1, backgroundColor: colors.greenSurface, padding: spacing.lg, paddingTop: spacing.xl },
+  drugList: { flex: 1 },
   modalCancel: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,

@@ -19,6 +19,7 @@ import { updateMyProfile, updateMyPassword, uploadMyPhoto } from '../services/pa
 import { lookupCep } from '../services/cep.service';
 import type { Patient } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function formatCep(value: string) {
   return value.replace(/\D/g, '').slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2');
@@ -39,6 +40,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState('');
   const [referencePoint, setReferencePoint] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const insets = useSafeAreaInsets();
   const [cepLoading, setCepLoading] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -176,7 +178,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
       </View>
 
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
       <View style={styles.photoSection}>
         <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8} disabled={uploadingPhoto}>
           {patient?.photo_url ? (

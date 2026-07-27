@@ -13,11 +13,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { familyMe, familyUpdatePassword, familyUpdateProfile } from '../services/family.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
 export default function FamilyProfileScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -103,7 +105,7 @@ export default function FamilyProfileScreen({ onBack }: { onBack: () => void }) 
       </View>
 
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.sectionTitle}>Meus dados</Text>
         <TextInput style={styles.input} placeholder="Nome" placeholderTextColor={colors.hint} value={name} onChangeText={setName} />
         <TextInput style={styles.input} placeholder="Telefone" placeholderTextColor={colors.hint} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />

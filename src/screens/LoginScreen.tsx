@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login, familyLogin } from '../services/auth.service';
 import type { AppRole } from '../services/api';
 import { colors, spacing, typography, buttonHeight } from '../theme';
@@ -46,6 +47,7 @@ export default function LoginScreen({
   const [alertInfo, setAlertInfo] = useState<{ title: string; message?: string } | null>(null);
   const fade = useRef(new Animated.Value(1)).current;
   const theme = ROLE_THEME[role];
+  const insets = useSafeAreaInsets();
 
   function switchRole(nextRole: AppRole) {
     Animated.sequence([
@@ -90,7 +92,7 @@ export default function LoginScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xl + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View style={{ opacity: fade }}>
