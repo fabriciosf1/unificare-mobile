@@ -27,6 +27,9 @@ import {
 } from '../services/family.service';
 import type { Appointment, FamilyContact, Medication, PendingApprovals } from '../types';
 import { colors, spacing, typography } from '../theme';
+import { API_BASE_URL } from '../config';
+import { getToken } from '../services/api';
+import AuthImage from '../components/AuthImage';
 
 function buildMapHtml(lat: number, lng: number, radius: number, name: string, photoUrl: string | null): string {
   return `<!DOCTYPE html>
@@ -123,6 +126,7 @@ export default function FamilyHomeScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [requestingCamera, setRequestingCamera] = useState(false);
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
+  const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
@@ -142,6 +146,38 @@ export default function FamilyHomeScreen({
   useEffect(() => {
     loadData().finally(() => setLoading(false));
   }, [loadData]);
+
+  // O marcador do mapa é HTML injetado na WebView (Leaflet) — um <img src> ali não manda o
+  // Bearer token, então buscamos a foto autenticada e convertemos pra data URI antes de embutir.
+  useEffect(() => {
+    let cancelled = false;
+    const path = contact?.patient.photo_url;
+    if (!path) {
+      setPhotoDataUri(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE_URL}${path}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (!cancelled) setPhotoDataUri(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      } catch {
+        if (!cancelled) setPhotoDataUri(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contact?.patient.photo_url]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -215,7 +251,7 @@ export default function FamilyHomeScreen({
         <WebView
           style={styles.map}
           originWhitelist={['*']}
-          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', contact?.patient.photo_url ?? null) }}
+          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', photoDataUri) }}
         />
       ) : (
         <View style={[styles.map, styles.noLocation]}>
@@ -258,7 +294,7 @@ export default function FamilyHomeScreen({
 
       <View style={[styles.statusCard, { bottom: insets.bottom + 96 }]}>
         {contact?.patient.photo_url ? (
-          <Image source={{ uri: contact.patient.photo_url }} style={styles.statusPhoto} />
+          <AuthImage path={contact.patient.photo_url} style={styles.statusPhoto} />
         ) : (
           <View style={[styles.statusPhoto, styles.statusPhotoPlaceholder]}>
             <Text style={styles.statusPhotoInitial}>{contact?.patient.name?.[0] ?? '?'}</Text>

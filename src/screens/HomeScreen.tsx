@@ -22,6 +22,7 @@ import type { Medication, MedicationDose, Patient, VitalSign } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import SosButton from '../components/SosButton';
 import CheckInCard from '../components/CheckInCard';
+import AuthImage from '../components/AuthImage';
 
 export default function HomeScreen({
   onLoggedOut,
@@ -147,7 +148,7 @@ export default function HomeScreen({
       <View style={styles.headerBar}>
         <TouchableOpacity style={styles.headerProfile} onPress={onOpenProfile} activeOpacity={0.8}>
           {patient?.photo_url ? (
-            <Image source={{ uri: patient.photo_url }} style={styles.avatar} />
+            <AuthImage path={patient.photo_url} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarPlaceholderText}>{patient?.name?.[0] ?? '?'}</Text>

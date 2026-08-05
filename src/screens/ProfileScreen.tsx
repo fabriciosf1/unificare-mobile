@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { me } from '../services/auth.service';
 import { updateMyProfile, updateMyPassword, uploadMyPhoto } from '../services/patient.service';
 import { lookupCep } from '../services/cep.service';
+import AuthImage from '../components/AuthImage';
 import type { Patient } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -182,7 +183,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
       <View style={styles.photoSection}>
         <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8} disabled={uploadingPhoto}>
           {patient?.photo_url ? (
-            <Image source={{ uri: patient.photo_url }} style={styles.photo} />
+            <AuthImage path={patient.photo_url} style={styles.photo} />
           ) : (
             <View style={[styles.photo, styles.photoPlaceholder]}>
               <Text style={styles.photoPlaceholderText}>{patient?.name?.[0] ?? '?'}</Text>
