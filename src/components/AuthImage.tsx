@@ -8,22 +8,43 @@ interface Props {
   style?: StyleProp<ImageStyle>;
 }
 
-// Foto de paciente/avatar agora exige auth:sanctum — Image aceita headers por requisição,
-// então buscamos o token salvo e mandamos o Bearer junto do source.
+// Foto de paciente/avatar exige auth:sanctum. O componente <Image> nativo com `headers` no
+// source não envia o Authorization de forma confiável (New Architecture do RN ignora/derruba
+// headers custom em boa parte dos casos), então a imagem simplesmente não aparecia. Solução:
+// buscar com fetch() (headers garantidos) e converter para data URI antes de renderizar.
 export default function AuthImage({ path, style }: Props) {
-  const [headers, setHeaders] = useState<Record<string, string> | null>(null);
+  const [dataUri, setDataUri] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getToken().then((token) => {
-      if (!cancelled && token) setHeaders({ Authorization: `Bearer ${token}` });
-    });
+    setDataUri(null);
+    if (!path) return;
+
+    (async () => {
+      const token = await getToken();
+      if (!token || cancelled) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}${path}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (!cancelled) setDataUri(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      } catch {
+        // sem imagem — mantém o placeholder de iniciais no componente pai
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [path]);
 
-  if (!path || !headers) return null;
+  if (!dataUri) return null;
 
-  return <Image source={{ uri: `${API_BASE_URL}${path}`, headers }} style={style} />;
+  return <Image source={{ uri: dataUri }} style={style} />;
 }

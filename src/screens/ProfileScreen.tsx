@@ -86,7 +86,7 @@ export default function ProfileScreen({ onBack }: { onBack: () => void }) {
     setUploadingPhoto(true);
     try {
       const { photo_url } = await uploadMyPhoto(result.assets[0].uri);
-      setPatient((prev) => (prev ? { ...prev, photo_url } : prev));
+      setPatient((prev) => (prev ? { ...prev, photo_url: `${photo_url}?t=${Date.now()}` } : prev));
     } catch {
       Alert.alert('Erro', 'Não foi possível atualizar sua foto.');
     } finally {
