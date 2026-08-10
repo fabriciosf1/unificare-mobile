@@ -36,7 +36,11 @@ function buildMapHtml(lat: number, lng: number, radius: number, name: string, ph
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    onerror="window.ReactNativeWebView.postMessage('map_error')"
+  />
   <style>
     html,body,#map{height:100%;margin:0;padding:0;}
     .marker-pin {
@@ -61,8 +65,14 @@ function buildMapHtml(lat: number, lng: number, radius: number, name: string, ph
 </head>
 <body>
   <div id="map"></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="window.ReactNativeWebView.postMessage('map_error')"></script>
   <script>
+    // unpkg.com/tile.openstreetmap.org bloqueados por firewall/rede pública não geram erro
+    // de navegação da WebView (é HTML inline, a "página" sempre carrega) — sem esse check,
+    // o app fica com o mapa em branco em vez de mostrar o fallback de erro.
+    if (typeof L === 'undefined') {
+      window.ReactNativeWebView.postMessage('map_error');
+    } else {
     const map = L.map('map').setView([${lat}, ${lng}], 17);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
@@ -88,6 +98,7 @@ function buildMapHtml(lat: number, lng: number, radius: number, name: string, ph
       fillColor: '${colors.teal}',
       fillOpacity: 0.15
     }).addTo(map);
+    }
   </script>
 </body>
 </html>`;
@@ -127,6 +138,7 @@ export default function FamilyHomeScreen({
   const [requestingCamera, setRequestingCamera] = useState(false);
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
   const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
+  const [mapError, setMapError] = useState(false);
   const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
@@ -141,6 +153,7 @@ export default function FamilyHomeScreen({
     }
     setAddress(loc.address);
     setSince(loc.since);
+    setMapError(false);
   }, []);
 
   useEffect(() => {
@@ -247,15 +260,24 @@ export default function FamilyHomeScreen({
 
   return (
     <View style={styles.screen}>
-      {location ? (
+      {location && !mapError ? (
         <WebView
           style={styles.map}
           originWhitelist={['*']}
           source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', photoDataUri) }}
+          onError={() => setMapError(true)}
+          onHttpError={() => setMapError(true)}
+          onMessage={(e) => {
+            if (e.nativeEvent.data === 'map_error') setMapError(true);
+          }}
         />
       ) : (
         <View style={[styles.map, styles.noLocation]}>
-          <Text style={styles.muted}>Ainda sem localização registrada.</Text>
+          <Text style={styles.muted}>
+            {mapError
+              ? 'Não foi possível carregar o mapa. Verifique sua conexão.'
+              : 'Ainda sem localização registrada.'}
+          </Text>
         </View>
       )}
 
