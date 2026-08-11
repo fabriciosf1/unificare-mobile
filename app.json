@@ -97,11 +97,19 @@
         }
       ],
       "./plugins/withAlarmSound",
-      "expo-health-connect",
+      "react-native-health-connect",
       [
         "react-native-health",
         {
           "healthSharePermission": "O UnifCare lê seus dados de saúde da Xiaomi Smart Band (frequência cardíaca, SpO2) para monitorar sua segurança."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
         }
       ]
     ],
