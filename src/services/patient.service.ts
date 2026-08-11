@@ -80,6 +80,16 @@ export function sendGpsPing(lat: number, lng: number): Promise<void> {
   return api.post('/me/locations', { gps_lat: String(lat), gps_lng: String(lng) });
 }
 
+export interface WearableVitalInput {
+  heart_rate?: number;
+  spo2?: number;
+  temperature?: number;
+}
+
+export function sendWearableVital(data: WearableVitalInput): Promise<void> {
+  return api.post('/me/vitals', data);
+}
+
 export function setMyGeofence(lat: number, lng: number, safeRadiusM?: number): Promise<void> {
   return api.put('/me/geofence', { gps_lat: lat, gps_lng: lng, safe_radius_m: safeRadiusM });
 }

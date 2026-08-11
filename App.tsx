@@ -8,6 +8,7 @@ import { me as getPatientMe } from './src/services/auth.service';
 import { familyMe } from './src/services/family.service';
 import { registerForPushNotifications, registerForFamilyPushNotifications, ensureCriticalAlertChannel } from './src/services/push.service';
 import { startBackgroundLocation } from './src/services/location.service';
+import { startWearableSync } from './src/services/wearable.service';
 import {
   handleAlarmAction,
   initAlarmChannel,
@@ -107,6 +108,7 @@ export default function App() {
           // sistema só exibir um diálogo e descartar os outros silenciosamente.
           await startBackgroundLocation().catch(() => {});
           await setupMedicationAlarms().catch(() => {});
+          await startWearableSync().catch(() => {});
         } else if (storedRole === 'family') {
           try {
             const contact = await familyMe();
@@ -239,6 +241,7 @@ export default function App() {
       await registerForPushNotifications().catch(() => {});
       await startBackgroundLocation().catch(() => {});
       await setupMedicationAlarms().catch(() => {});
+      await startWearableSync().catch(() => {});
     } else {
       await registerForFamilyPushNotifications().catch(() => {});
     }
@@ -250,6 +253,7 @@ export default function App() {
       await registerForPushNotifications().catch(() => {});
       await startBackgroundLocation().catch(() => {});
       await setupMedicationAlarms().catch(() => {});
+      await startWearableSync().catch(() => {});
     } else if (role === 'family') {
       await registerForFamilyPushNotifications().catch(() => {});
     }
