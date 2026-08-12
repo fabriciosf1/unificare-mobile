@@ -32,6 +32,7 @@ export default function HomeScreen({
   onAddExam,
   onOpenProfile,
   onOpenFamiliares,
+  onOpenWearableSetup,
   onOpenSosCamera,
 }: {
   onLoggedOut: () => void;
@@ -41,6 +42,7 @@ export default function HomeScreen({
   onAddExam: () => void;
   onOpenProfile: () => void;
   onOpenFamiliares: () => void;
+  onOpenWearableSetup: () => void;
   onOpenSosCamera: (patientId: number) => void;
 }) {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -184,6 +186,9 @@ export default function HomeScreen({
         ) : (
           <Text style={styles.muted}>Nenhuma leitura registrada ainda.</Text>
         )}
+        <TouchableOpacity style={styles.wearableLink} onPress={onOpenWearableSetup} activeOpacity={0.7}>
+          <Text style={styles.wearableLinkText}>⌚ Configurar relógio</Text>
+        </TouchableOpacity>
       </View>
 
       <CheckInCard />
@@ -368,6 +373,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   muted: { fontSize: typography.label, color: colors.muted },
   vitalsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  wearableLink: { marginTop: spacing.md, alignSelf: 'flex-start' },
+  wearableLinkText: { color: colors.green, fontWeight: '700', fontSize: 14 },
   vitalItem: { alignItems: 'center', flex: 1 },
   vitalValue: { fontSize: typography.subtitle, fontWeight: '700', color: colors.green },
   vitalLabel: { fontSize: 14, color: colors.muted, marginTop: 4, textAlign: 'center' },

@@ -27,6 +27,7 @@ import EditExamScreen from './src/screens/EditExamScreen';
 import ExamsScreen from './src/screens/ExamsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FamiliaresScreen from './src/screens/FamiliaresScreen';
+import WearableSetupScreen from './src/screens/WearableSetupScreen';
 import FamilyHomeScreen from './src/screens/FamilyHomeScreen';
 import FamilyProfileScreen from './src/screens/FamilyProfileScreen';
 import FamilyAlertsScreen from './src/screens/FamilyAlertsScreen';
@@ -41,7 +42,7 @@ import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
 import type { ExamResult, Medication } from './src/types';
 
-type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares';
+type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares' | 'wearableSetup';
 type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
@@ -455,6 +456,7 @@ export default function App() {
           onAddExam={() => setPatientScreen('exams')}
           onOpenProfile={() => setPatientScreen('profile')}
           onOpenFamiliares={() => setPatientScreen('familiares')}
+          onOpenWearableSetup={() => setPatientScreen('wearableSetup')}
           onOpenSosCamera={(patientId) => {
             setSosCall({ patientId, patientName: '' });
             setPatientScreen('sosCamera');
@@ -466,6 +468,9 @@ export default function App() {
       )}
       {loggedIn && role === 'patient' && patientScreen === 'familiares' && (
         <FamiliaresScreen onBack={() => setPatientScreen('home')} />
+      )}
+      {loggedIn && role === 'patient' && patientScreen === 'wearableSetup' && (
+        <WearableSetupScreen onBack={() => setPatientScreen('home')} />
       )}
       {loggedIn && role === 'patient' && patientScreen === 'history' && (
         <AlertsHistoryScreen onBack={() => setPatientScreen('home')} />
