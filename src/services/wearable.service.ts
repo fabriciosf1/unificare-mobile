@@ -6,6 +6,10 @@ import { sendWearableVital } from './patient.service';
 // esses dados nas libs disponíveis. Sync é por polling em foreground.
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
 
+// Janela de busca maior que o intervalo de sync: evita perder uma medição feita
+// entre um app aberto e outro (ex.: usuário mediu, fechou o app, só reabriu depois).
+const READ_LOOKBACK_MS = 60 * 60 * 1000;
+
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 
 interface WearableSample {
@@ -24,12 +28,18 @@ async function requestAndroidPermissions(): Promise<boolean> {
     { accessType: 'read', recordType: 'OxygenSaturation' },
     { accessType: 'read', recordType: 'BodyTemperature' },
   ]);
+
+  // Pedido isolado: em alguns aparelhos/versões do Health Connect, RestingHeartRate
+  // não é reconhecido e derruba a promise inteira — não pode travar HR/SpO2/temperatura,
+  // que já funcionam sem ela.
+  await HealthConnect.requestPermission([{ accessType: 'read', recordType: 'RestingHeartRate' }]).catch(() => []);
+
   return granted.length > 0;
 }
 
 async function readAndroidSample(): Promise<WearableSample> {
   const HealthConnect = await import('react-native-health-connect');
-  const since = new Date(Date.now() - SYNC_INTERVAL_MS).toISOString();
+  const since = new Date(Date.now() - READ_LOOKBACK_MS).toISOString();
   const now = new Date().toISOString();
   const timeRangeFilter = { operator: 'between' as const, startTime: since, endTime: now };
 
@@ -37,7 +47,15 @@ async function readAndroidSample(): Promise<WearableSample> {
 
   const heartRate = await HealthConnect.readRecords('HeartRate', { timeRangeFilter }).catch(() => null);
   const lastHeartRateSample = heartRate?.records.at(-1)?.samples.at(-1);
-  if (lastHeartRateSample) sample.heart_rate = lastHeartRateSample.beatsPerMinute;
+  if (lastHeartRateSample) {
+    sample.heart_rate = lastHeartRateSample.beatsPerMinute;
+  } else {
+    // Medições manuais avulsas (ex.: "medir agora" no Mi Fitness) costumam ser gravadas
+    // como RestingHeartRate (valor único), não HeartRate (série contínua com samples).
+    const restingHeartRate = await HealthConnect.readRecords('RestingHeartRate', { timeRangeFilter }).catch(() => null);
+    const lastResting = restingHeartRate?.records.at(-1);
+    if (lastResting) sample.heart_rate = lastResting.beatsPerMinute;
+  }
 
   const spo2 = await HealthConnect.readRecords('OxygenSaturation', { timeRangeFilter }).catch(() => null);
   const lastSpo2 = spo2?.records.at(-1);
@@ -70,7 +88,7 @@ async function requestIosPermissions(): Promise<boolean> {
 
 async function readIosSample(): Promise<WearableSample> {
   const AppleHealthKit = (await import('react-native-health')).default;
-  const since = new Date(Date.now() - SYNC_INTERVAL_MS).toISOString();
+  const since = new Date(Date.now() - READ_LOOKBACK_MS).toISOString();
   const options = { startDate: since, limit: 1, ascending: false };
 
   const sample: WearableSample = {};
