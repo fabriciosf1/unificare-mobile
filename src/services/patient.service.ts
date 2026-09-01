@@ -53,6 +53,8 @@ export interface NewMedicationInput {
   dosage: string;
   frequency: string;
   type: 'continuous' | 'period';
+  identifier_color?: string | null;
+  identifier_number?: number | null;
   schedule_times: string[];
   start_date: string;
   end_date?: string;

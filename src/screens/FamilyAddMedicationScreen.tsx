@@ -22,6 +22,7 @@ import type { Drug } from '../services/patient.service';
 import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
+import MedicationIdentifierPicker from '../components/MedicationIdentifierPicker';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
@@ -45,6 +46,8 @@ export default function FamilyAddMedicationScreen({
   const [frequency, setFrequency] = useState(medication?.frequency ?? '');
   const [scheduleTimes, setScheduleTimes] = useState<string[]>(medication?.schedule_times ?? []);
   const [medType, setMedType] = useState<'continuous' | 'period'>(medication?.type ?? 'continuous');
+  const [identifierColor, setIdentifierColor] = useState<string | null>(medication?.identifier_color ?? null);
+  const [identifierNumber, setIdentifierNumber] = useState(medication?.identifier_number != null ? String(medication.identifier_number) : '');
   const [endDate, setEndDate] = useState<Date | null>(medication?.end_date ? new Date(medication.end_date) : null);
   const [notes, setNotes] = useState(medication?.notes ?? '');
   const [saving, setSaving] = useState(false);
@@ -112,6 +115,8 @@ export default function FamilyAddMedicationScreen({
           dosage,
           frequency,
           type: medType,
+          identifier_color: identifierColor,
+          identifier_number: identifierNumber ? Number(identifierNumber) : null,
           schedule_times: scheduleTimes,
           end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
           notes: notes || undefined,
@@ -123,6 +128,8 @@ export default function FamilyAddMedicationScreen({
           dosage,
           frequency,
           type: medType,
+          identifier_color: identifierColor,
+          identifier_number: identifierNumber ? Number(identifierNumber) : null,
           schedule_times: scheduleTimes,
           start_date: new Date().toISOString().slice(0, 10),
           end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
@@ -131,8 +138,9 @@ export default function FamilyAddMedicationScreen({
         Alert.alert('Cadastrado', 'O remédio foi cadastrado para o paciente.');
       }
       onSaved();
-    } catch {
-      Alert.alert('Erro', isEdit ? 'Não foi possível atualizar o remédio. Tente novamente.' : 'Não foi possível cadastrar o remédio. Tente novamente.');
+    } catch (err) {
+      const fallback = isEdit ? 'Não foi possível atualizar o remédio. Tente novamente.' : 'Não foi possível cadastrar o remédio. Tente novamente.';
+      Alert.alert('Erro', err instanceof Error ? err.message : fallback);
     } finally {
       setSaving(false);
     }
@@ -295,6 +303,14 @@ export default function FamilyAddMedicationScreen({
           }}
         />
       )}
+
+      <MedicationIdentifierPicker
+        accent={colors.blue}
+        color={identifierColor}
+        onColorChange={setIdentifierColor}
+        number={identifierNumber}
+        onNumberChange={setIdentifierNumber}
+      />
 
       <TextInput
         style={[styles.input, styles.notesInput]}

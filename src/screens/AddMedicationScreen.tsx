@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDrugCatalog, requestMedication, type Drug } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
+import MedicationIdentifierPicker from '../components/MedicationIdentifierPicker';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
@@ -34,6 +35,8 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   const [frequency, setFrequency] = useState('');
   const [scheduleTimes, setScheduleTimes] = useState<string[]>([]);
   const [medType, setMedType] = useState<'continuous' | 'period'>('continuous');
+  const [identifierColor, setIdentifierColor] = useState<string | null>(null);
+  const [identifierNumber, setIdentifierNumber] = useState('');
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -96,6 +99,8 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         dosage,
         frequency,
         type: medType,
+        identifier_color: identifierColor,
+        identifier_number: identifierNumber ? Number(identifierNumber) : null,
         schedule_times: scheduleTimes,
         start_date: new Date().toISOString().slice(0, 10),
         end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
@@ -103,8 +108,8 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
       });
       Alert.alert('Enviado', 'Seu remédio foi cadastrado e aguarda aprovação da sua família.');
       onSaved();
-    } catch {
-      Alert.alert('Erro', 'Não foi possível cadastrar o remédio. Tente novamente.');
+    } catch (err) {
+      Alert.alert('Erro', err instanceof Error ? err.message : 'Não foi possível cadastrar o remédio. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -246,6 +251,14 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
           }}
         />
       )}
+
+      <MedicationIdentifierPicker
+        accent={colors.green}
+        color={identifierColor}
+        onColorChange={setIdentifierColor}
+        number={identifierNumber}
+        onNumberChange={setIdentifierNumber}
+      />
 
       <TextInput
         style={[styles.input, styles.notesInput]}

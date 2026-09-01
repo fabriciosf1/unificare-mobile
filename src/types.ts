@@ -43,6 +43,8 @@ export interface Medication {
   dosage: string;
   frequency: string;
   type: 'continuous' | 'period';
+  identifier_color?: string | null;
+  identifier_number?: number | null;
   start_date?: string;
   end_date?: string | null;
   schedule_times: string[];

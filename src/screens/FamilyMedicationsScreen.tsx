@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteFamilyMedication, getFamilyMedicationsToday, logFamilyMedication } from '../services/family.service';
 import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
+import MedicationIdentifierBadge from '../components/MedicationIdentifierBadge';
 
 export default function FamilyMedicationsScreen({
   onBack,
@@ -140,7 +141,10 @@ export default function FamilyMedicationsScreen({
           <View key={med.uuid} style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.medName}>{med.name}</Text>
+                <View style={styles.medNameRow}>
+                  <Text style={styles.medName}>{med.name}</Text>
+                  <MedicationIdentifierBadge color={med.identifier_color} number={med.identifier_number} />
+                </View>
                 <Text style={styles.medDosage}>{med.dosage} • {med.frequency}</Text>
                 <Text style={styles.medDuration}>
                   {med.type === 'period' && med.end_date
@@ -290,6 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardActionText: { fontSize: 15 },
+  medNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   medName: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text },
   medDosage: { fontSize: 14, color: colors.muted, marginTop: 2 },
   medDuration: { fontSize: 12, color: colors.hint, marginTop: 2, marginBottom: spacing.sm },

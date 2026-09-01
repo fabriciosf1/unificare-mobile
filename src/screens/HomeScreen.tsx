@@ -23,6 +23,7 @@ import { colors, spacing, typography, buttonHeight } from '../theme';
 import SosButton from '../components/SosButton';
 import CheckInCard from '../components/CheckInCard';
 import AuthImage from '../components/AuthImage';
+import MedicationIdentifierBadge from '../components/MedicationIdentifierBadge';
 
 export default function HomeScreen({
   onLoggedOut,
@@ -203,7 +204,10 @@ export default function HomeScreen({
               {nextDose.is_late ? '⚠️ Atrasado — ' : nextDoseActionable ? '⏰ Agora — ' : '🕐 Próximo — '}
               {nextDose.time}
             </Text>
-            <Text style={styles.nextDoseName}>{nextDose.medication.name}</Text>
+            <View style={styles.nextDoseNameRow}>
+              <Text style={styles.nextDoseName}>{nextDose.medication.name}</Text>
+              <MedicationIdentifierBadge color={nextDose.medication.identifier_color} number={nextDose.medication.identifier_number} />
+            </View>
             <Text style={styles.medDosage}>{nextDose.medication.dosage}</Text>
             {nextDoseActionable ? (
               <View style={styles.nextDoseActions}>
@@ -238,6 +242,7 @@ export default function HomeScreen({
                 style={[styles.doseRow, d === nextDose && styles.doseRowActive]}
               >
                 <Text style={styles.doseTime}>{d.time}</Text>
+                <MedicationIdentifierBadge color={d.medication.identifier_color} number={d.medication.identifier_number} />
                 <Text style={styles.doseMedName} numberOfLines={1}>{d.medication.name}</Text>
                 <Text
                   style={[
@@ -256,7 +261,10 @@ export default function HomeScreen({
         {pendingMeds.map((med) => (
           <View key={med.uuid} style={styles.medRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.medName}>{med.name}</Text>
+              <View style={styles.nextDoseNameRow}>
+                <Text style={styles.medName}>{med.name}</Text>
+                <MedicationIdentifierBadge color={med.identifier_color} number={med.identifier_number} />
+              </View>
               <Text style={styles.medDosage}>
                 {med.dosage} • {med.schedule_times.join(', ')}
               </Text>
@@ -420,11 +428,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   nextDoseAlarm: { color: colors.green, fontWeight: '700', fontSize: typography.label, marginBottom: 4 },
+  nextDoseNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   nextDoseName: { color: colors.text, fontWeight: '700', fontSize: typography.subtitle },
   doseList: { marginTop: spacing.sm },
   doseRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
