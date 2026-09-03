@@ -25,6 +25,10 @@ import CheckInCard from '../components/CheckInCard';
 import AuthImage from '../components/AuthImage';
 import MedicationIdentifierBadge from '../components/MedicationIdentifierBadge';
 
+function doseKey(medicationId: number, scheduledAt: string) {
+  return `${medicationId}-${scheduledAt}`;
+}
+
 export default function HomeScreen({
   onLoggedOut,
   onOpenHistory,
@@ -52,7 +56,14 @@ export default function HomeScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{ title: string; message?: string } | null>(null);
+  // Cada dose pode ser adiada independentemente — chave "medicationId-scheduledAt" → timestamp de expiração do adiamento.
+  const [snoozedDoses, setSnoozedDoses] = useState<Record<string, number>>({});
   const insets = useSafeAreaInsets();
+
+  function isDoseSnoozed(medicationId: number, scheduledAt: string) {
+    const until = snoozedDoses[doseKey(medicationId, scheduledAt)];
+    return !!until && Date.now() < until;
+  }
 
   const loadData = useCallback(async () => {
     const [p, v, meds] = await Promise.all([me(), getLatestVital(), getTodayMedications()]);
@@ -114,6 +125,7 @@ export default function HomeScreen({
   async function handleSnooze(medication: Medication, dose: MedicationDose) {
     try {
       await snoozeMedicationAlarm(medication, dose.time, dose.scheduled_at);
+      setSnoozedDoses((prev) => ({ ...prev, [doseKey(medication.id, dose.scheduled_at)]: Date.now() + 10 * 60 * 1000 }));
     } catch {
       setAlertInfo({ title: 'Erro', message: 'Não foi possível adiar o alarme.' });
     }
@@ -133,9 +145,20 @@ export default function HomeScreen({
     .filter((m) => m.approval_status !== 'pending')
     .flatMap((m) => m.today_doses.map((d) => ({ ...d, medication: m })))
     .sort((a, b) => a.time.localeCompare(b.time));
-  const nextDose = doses.find((d) => d.status === 'pending');
+  const pendingDoses = doses.filter((d) => d.status === 'pending');
+  // Pula doses já adiadas pra destacar a próxima que ainda precisa de ação — se todas estiverem
+  // adiadas, cai no fallback e mostra a primeira mesmo assim (com o rótulo de "adiado").
+  const nextDose =
+    pendingDoses.find((d) => !isDoseSnoozed(d.medication.id, d.scheduled_at)) ?? pendingDoses[0];
   // Botões só liberam a partir de 10min antes do horário — antes disso, dose.is_late também é false
   const nextDoseActionable = !!nextDose && Date.now() >= new Date(nextDose.scheduled_at).getTime() - 10 * 60 * 1000;
+  const nextDoseSnoozed = !!nextDose && isDoseSnoozed(nextDose.medication.id, nextDose.scheduled_at);
+  const snoozedUntilLabel = nextDoseSnoozed
+    ? new Date(snoozedDoses[doseKey(nextDose.medication.id, nextDose.scheduled_at)]).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
   if (loading) {
     return (
@@ -209,7 +232,9 @@ export default function HomeScreen({
               <MedicationIdentifierBadge color={nextDose.medication.identifier_color} number={nextDose.medication.identifier_number} />
             </View>
             <Text style={styles.medDosage}>{nextDose.medication.dosage}</Text>
-            {nextDoseActionable ? (
+            {nextDoseSnoozed ? (
+              <Text style={styles.snoozedLabel}>🕐 Adiado até {snoozedUntilLabel}</Text>
+            ) : nextDoseActionable ? (
               <View style={styles.nextDoseActions}>
                 <TouchableOpacity
                   style={[styles.takeButton, styles.nextDoseActionButton]}
@@ -251,7 +276,15 @@ export default function HomeScreen({
                     d.status === 'pending' && d.is_late && styles.doseStatusLate,
                   ]}
                 >
-                  {d.status === 'taken' ? '✓ Tomado' : d.is_late ? 'Atrasado' : d === nextDose && nextDoseActionable ? 'Agora' : 'Aguardando'}
+                  {d.status === 'taken'
+                    ? '✓ Tomado'
+                    : isDoseSnoozed(d.medication.id, d.scheduled_at)
+                    ? 'Adiado'
+                    : d.is_late
+                    ? 'Atrasado'
+                    : d === nextDose && nextDoseActionable
+                    ? 'Agora'
+                    : 'Aguardando'}
                 </Text>
               </View>
             ))}
@@ -417,6 +450,7 @@ const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   snoozeButtonText: { color: colors.green, fontWeight: '700', fontSize: typography.label },
+  snoozedLabel: { color: colors.muted, fontWeight: '600', fontSize: typography.label },
   takenLabel: { color: colors.green, fontWeight: '700', fontSize: typography.label },
   pendingLabel: { color: colors.yellow, fontWeight: '700', fontSize: 14, textAlign: 'right', maxWidth: 120 },
   nextDoseBox: {
