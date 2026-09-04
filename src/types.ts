@@ -32,7 +32,8 @@ export interface VitalSign {
 export interface MedicationDose {
   time: string; // 'HH:MM'
   scheduled_at: string;
-  status: 'taken' | 'pending' | 'missed' | 'late';
+  // refused / out_of_stock: registrados pela Alexa (Iteração 2) — sem botão "Tomei" nesses estados
+  status: 'taken' | 'pending' | 'missed' | 'late' | 'refused' | 'out_of_stock';
   is_late: boolean;
 }
 
@@ -48,7 +49,9 @@ export interface Medication {
   start_date?: string;
   end_date?: string | null;
   schedule_times: string[];
-  today_adherence: 'taken' | 'pending' | 'missed' | 'late';
+  today_adherence: 'taken' | 'pending' | 'missed' | 'late' | 'refused' | 'out_of_stock';
+  // 'awaiting_restock' = paciente avisou pela Alexa que acabou; a equipe libera pelo painel web
+  stock_status?: 'ok' | 'awaiting_restock';
   today_doses: MedicationDose[];
   approval_status?: 'approved' | 'pending' | 'rejected';
   notes?: string | null;

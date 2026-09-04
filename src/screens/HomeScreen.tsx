@@ -145,7 +145,8 @@ export default function HomeScreen({
     .filter((m) => m.approval_status !== 'pending')
     .flatMap((m) => m.today_doses.map((d) => ({ ...d, medication: m })))
     .sort((a, b) => a.time.localeCompare(b.time));
-  const pendingDoses = doses.filter((d) => d.status === 'pending');
+  // Remédio aguardando reposição (avisado pela Alexa) não vira "próxima dose" nem ganha botão Tomei.
+  const pendingDoses = doses.filter((d) => d.status === 'pending' && d.medication.stock_status !== 'awaiting_restock');
   // Pula doses já adiadas pra destacar a próxima que ainda precisa de ação — se todas estiverem
   // adiadas, cai no fallback e mostra a primeira mesmo assim (com o rótulo de "adiado").
   const nextDose =
@@ -273,11 +274,16 @@ export default function HomeScreen({
                   style={[
                     styles.doseStatus,
                     d.status === 'taken' && styles.doseStatusTaken,
+                    d.status === 'refused' && styles.doseStatusLate,
                     d.status === 'pending' && d.is_late && styles.doseStatusLate,
                   ]}
                 >
                   {d.status === 'taken'
                     ? '✓ Tomado'
+                    : d.status === 'refused'
+                    ? '✗ Recusado'
+                    : d.status === 'out_of_stock' || d.medication.stock_status === 'awaiting_restock'
+                    ? '📦 Sem estoque'
                     : isDoseSnoozed(d.medication.id, d.scheduled_at)
                     ? 'Adiado'
                     : d.is_late

@@ -181,6 +181,10 @@ export default function FamilyMedicationsScreen({
               <Text style={styles.pendingLabel}>Aguardando aprovação</Text>
             )}
 
+            {med.stock_status === 'awaiting_restock' && (
+              <Text style={styles.restockLabel}>📦 Sem estoque — aguardando reposição (avisado pela Alexa)</Text>
+            )}
+
             {med.approval_status === 'approved' && med.today_doses.length === 0 && (
               <Text style={styles.muted}>Nenhum horário para hoje.</Text>
             )}
@@ -191,7 +195,11 @@ export default function FamilyMedicationsScreen({
               return (
                 <View key={dose.time} style={styles.doseRow}>
                   <Text style={styles.doseTime}>{dose.time}</Text>
-                  {dose.status !== 'taken' ? (
+                  {dose.status === 'refused' ? (
+                    <Text style={[styles.doseStatus, styles.doseStatusLate]}>✗ Recusado</Text>
+                  ) : dose.status === 'out_of_stock' || med.stock_status === 'awaiting_restock' ? (
+                    <Text style={[styles.doseStatus, styles.doseStatusRestock]}>📦 Sem estoque</Text>
+                  ) : dose.status !== 'taken' ? (
                     <View style={styles.doseActions}>
                       <Text style={[styles.doseStatus, dose.is_late && styles.doseStatusLate]}>
                         {dose.is_late ? 'Atrasado' : 'Aguardando'}
@@ -312,6 +320,8 @@ const styles = StyleSheet.create({
   doseStatus: { fontSize: 14, color: colors.muted, fontWeight: '600' },
   doseStatusTaken: { color: colors.green },
   doseStatusLate: { color: colors.red },
+  doseStatusRestock: { color: colors.muted },
+  restockLabel: { color: colors.red, fontWeight: '600', fontSize: 13, marginBottom: 6 },
   confirmButton: {
     backgroundColor: colors.blue,
     paddingHorizontal: spacing.md,
