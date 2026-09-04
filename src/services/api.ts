@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { API_BASE_URL } from '../config';
+import { getActivePatientUuid, clearActivePatient } from './familyPatientContext';
 
 const TOKEN_KEY = 'uc_patient_token';
 const ROLE_KEY = 'uc_app_role';
@@ -28,6 +29,15 @@ export async function setToken(token: string): Promise<void> {
 export async function clearToken(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
   await SecureStore.deleteItemAsync(ROLE_KEY);
+  await clearActivePatient();
+}
+
+// Contato da família pode estar vinculado a mais de 1 paciente — toda rota /family/* que
+// depende de "qual paciente" exige esse header (ver ResolveFamilyActivePatient no backend).
+function activePatientHeaders(role: AppRole | null): Record<string, string> {
+  if (role !== 'family') return {};
+  const uuid = getActivePatientUuid();
+  return uuid ? { 'X-Patient-Uuid': uuid } : {};
 }
 
 export async function getRole(): Promise<AppRole | null> {
@@ -39,7 +49,7 @@ export async function setRole(role: AppRole): Promise<void> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = await getToken();
+  const [token, role] = await Promise.all([getToken(), getRole()]);
 
   let response: Response;
   try {
@@ -50,6 +60,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...activePatientHeaders(role),
         ...options.headers,
       },
     });
@@ -73,7 +84,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 async function upload<T>(path: string, formData: FormData): Promise<T> {
-  const token = await getToken();
+  const [token, role] = await Promise.all([getToken(), getRole()]);
 
   let response: Response;
   try {
@@ -84,6 +95,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
       headers: {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...activePatientHeaders(role),
       },
     });
   } catch (err) {
@@ -116,11 +128,11 @@ async function appendFilePart(
 }
 
 async function downloadAndOpen(path: string, fileName: string): Promise<void> {
-  const token = await getToken();
+  const [token, role] = await Promise.all([getToken(), getRole()]);
   const destination = new File(Paths.cache, fileName);
 
   const task = File.createDownloadTask(`${API_BASE_URL}${path}`, destination, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...activePatientHeaders(role) },
     signal: withTimeout(DOWNLOAD_TIMEOUT_MS),
   });
 

@@ -77,25 +77,28 @@ export interface PatientContact {
   is_primary: boolean;
 }
 
+export interface FamilyPatient {
+  id: number; // uso interno (canal Reverb camera.{id}) — não usar em URLs
+  uuid: string;
+  name: string;
+  photo_url: string | null;
+  age?: number | null;
+  relationship: string | null;
+  is_primary: boolean;
+  threshold?: {
+    home_lat: number | null;
+    home_lng: number | null;
+    safe_radius_m: number;
+  };
+}
+
 export interface FamilyContact {
   uuid: string;
   name: string;
   phone?: string | null;
   email?: string | null;
-  relationship: string | null;
   password_must_change?: boolean;
-  patient: {
-    id: number; // uso interno (canal Reverb camera.{id}) — não usar em URLs
-    uuid: string;
-    name: string;
-    photo_url: string | null;
-    age?: number | null;
-    threshold?: {
-      home_lat: number | null;
-      home_lng: number | null;
-      safe_radius_m: number;
-    };
-  };
+  patients: FamilyPatient[];
 }
 
 export interface PendingApprovals {

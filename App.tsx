@@ -6,6 +6,8 @@ import notifee, { EventType } from 'react-native-notify-kit';
 import { getToken, getRole, AppRole } from './src/services/api';
 import { me as getPatientMe } from './src/services/auth.service';
 import { familyMe } from './src/services/family.service';
+import { loadActivePatient, getActivePatientUuid, setActivePatientUuid } from './src/services/familyPatientContext';
+import type { FamilyContact, FamilyPatient } from './src/types';
 import { registerForPushNotifications, registerForFamilyPushNotifications, ensureCriticalAlertChannel } from './src/services/push.service';
 import { startBackgroundLocation } from './src/services/location.service';
 import { startWearableSync } from './src/services/wearable.service';
@@ -37,13 +39,14 @@ import FamilyEditExamScreen from './src/screens/FamilyEditExamScreen';
 import FamilyExamsScreen from './src/screens/FamilyExamsScreen';
 import FamilyAddMedicationScreen from './src/screens/FamilyAddMedicationScreen';
 import FamilyAddAppointmentScreen from './src/screens/FamilyAddAppointmentScreen';
+import FamilySelectPatientScreen from './src/screens/FamilySelectPatientScreen';
 import SosCameraScreen from './src/screens/SosCameraScreen';
 import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
 import type { ExamResult, Medication } from './src/types';
 
 type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares' | 'wearableSetup';
-type FamilyScreen = 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
+type FamilyScreen = 'loading' | 'selectPatient' | 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
@@ -68,13 +71,34 @@ async function setupMedicationAlarms(): Promise<void> {
   }
 }
 
+// Contato da família pode estar vinculado a mais de 1 paciente — decide se cai direto na
+// Home (0 ou 1 vínculo, ou vínculo salvo ainda válido) ou precisa escolher primeiro.
+async function resolveFamilyActivePatient(
+  contact: FamilyContact,
+  setFamilyScreen: (screen: FamilyScreen) => void,
+): Promise<void> {
+  if (contact.patients.length <= 1) {
+    if (contact.patients[0]) await setActivePatientUuid(contact.patients[0].uuid);
+    setFamilyScreen('home');
+    return;
+  }
+
+  const stored = getActivePatientUuid();
+  if (stored && contact.patients.some((p) => p.uuid === stored)) {
+    setFamilyScreen('home');
+    return;
+  }
+
+  setFamilyScreen('selectPatient');
+}
+
 export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
   const [role, setRole] = useState<AppRole | null>(null);
   const [authScreen, setAuthScreen] = useState<AuthScreen>('login');
   const [patientScreen, setPatientScreen] = useState<PatientScreen>('home');
-  const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('home');
+  const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('loading');
   const [sosCall, setSosCall] = useState<SosCallData | null>(null);
   const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
   const [editingExam, setEditingExam] = useState<ExamResult | null>(null);
@@ -111,6 +135,7 @@ export default function App() {
           await setupMedicationAlarms().catch(() => {});
           await startWearableSync().catch(() => {});
         } else if (storedRole === 'family') {
+          await loadActivePatient();
           try {
             const contact = await familyMe();
             if (contact.password_must_change) {
@@ -118,6 +143,7 @@ export default function App() {
               setCheckingSession(false);
               return;
             }
+            await resolveFamilyActivePatient(contact, setFamilyScreen);
           } catch {
             // idem — segue o fluxo normal se a checagem falhar
           }
@@ -245,6 +271,8 @@ export default function App() {
       await startWearableSync().catch(() => {});
     } else {
       await registerForFamilyPushNotifications().catch(() => {});
+      const contact = await familyMe().catch(() => null);
+      if (contact) await resolveFamilyActivePatient(contact, setFamilyScreen);
     }
   }
 
@@ -257,6 +285,8 @@ export default function App() {
       await startWearableSync().catch(() => {});
     } else if (role === 'family') {
       await registerForFamilyPushNotifications().catch(() => {});
+      const contact = await familyMe().catch(() => null);
+      if (contact) await resolveFamilyActivePatient(contact, setFamilyScreen);
     }
   }
 
@@ -277,7 +307,14 @@ export default function App() {
       if (role === 'family') {
         switch (familyScreen) {
           case 'home':
+          case 'loading':
             return false;
+          case 'selectPatient':
+            if (getActivePatientUuid()) {
+              setFamilyScreen('home');
+              return true;
+            }
+            return true;
           case 'editMedication':
             setEditingMedication(null);
             setFamilyScreen('medications');
@@ -334,7 +371,7 @@ export default function App() {
     setRole(null);
     setAuthScreen('login');
     setPatientScreen('home');
-    setFamilyScreen('home');
+    setFamilyScreen('loading');
     setSosCall(null);
     setMustChangePassword(false);
   }
@@ -366,6 +403,18 @@ export default function App() {
         <ChangePasswordScreen role={role} onChanged={handlePasswordChanged} />
       )}
 
+      {loggedIn && role === 'family' && familyScreen === 'loading' && !mustChangePassword && (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.blue} />
+        </View>
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'selectPatient' && !mustChangePassword && (
+        <FamilySelectPatientScreen
+          allowBack={!!getActivePatientUuid()}
+          onSelected={() => setFamilyScreen('home')}
+          onBack={() => setFamilyScreen('home')}
+        />
+      )}
       {loggedIn && role === 'family' && familyScreen === 'home' && !mustChangePassword && (
         <FamilyHomeScreen
           onLoggedOut={handleLoggedOut}
@@ -378,6 +427,7 @@ export default function App() {
           onOpenAddExam={() => setFamilyScreen('exams')}
           onOpenAddAppointment={() => setFamilyScreen('addAppointment')}
           onOpenProfile={() => setFamilyScreen('profile')}
+          onSwitchPatient={() => setFamilyScreen('selectPatient')}
         />
       )}
       {loggedIn && role === 'family' && familyScreen === 'profile' && (

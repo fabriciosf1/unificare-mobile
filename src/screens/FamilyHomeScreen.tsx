@@ -25,10 +25,11 @@ import {
   rejectMedication,
   requestCamera,
 } from '../services/family.service';
-import type { Appointment, FamilyContact, Medication, PendingApprovals } from '../types';
+import type { Appointment, FamilyContact, FamilyPatient, Medication, PendingApprovals } from '../types';
 import { colors, spacing, typography } from '../theme';
 import { API_BASE_URL } from '../config';
 import { getToken } from '../services/api';
+import { getActivePatientUuid } from '../services/familyPatientContext';
 import AuthImage from '../components/AuthImage';
 
 function buildMapHtml(lat: number, lng: number, radius: number, name: string, photoUrl: string | null): string {
@@ -118,6 +119,7 @@ export default function FamilyHomeScreen({
   onOpenAddExam,
   onOpenAddAppointment,
   onOpenProfile,
+  onSwitchPatient,
 }: {
   onLoggedOut: () => void;
   onOpenAlerts: () => void;
@@ -126,8 +128,10 @@ export default function FamilyHomeScreen({
   onOpenAddExam: () => void;
   onOpenAddAppointment: () => void;
   onOpenProfile: () => void;
+  onSwitchPatient: () => void;
 }) {
   const [contact, setContact] = useState<FamilyContact | null>(null);
+  const [activePatient, setActivePatient] = useState<FamilyPatient | null>(null);
   const [pending, setPending] = useState<PendingApprovals>({ medications: [], appointments: [] });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
@@ -142,8 +146,12 @@ export default function FamilyHomeScreen({
   const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
-    const [c, p, loc] = await Promise.all([familyMe(), getPendingApprovals(), getLatestLocation()]);
+    const c = await familyMe();
     setContact(c);
+    const uuid = getActivePatientUuid();
+    setActivePatient(c.patients.find((p) => p.uuid === uuid) ?? c.patients[0] ?? null);
+
+    const [p, loc] = await Promise.all([getPendingApprovals(), getLatestLocation()]);
     setPending(p);
     if (loc.location?.gps_lat && loc.location?.gps_lng) {
       setLocation({ lat: parseFloat(loc.location.gps_lat), lng: parseFloat(loc.location.gps_lng) });
@@ -164,7 +172,7 @@ export default function FamilyHomeScreen({
   // Bearer token, então buscamos a foto autenticada e convertemos pra data URI antes de embutir.
   useEffect(() => {
     let cancelled = false;
-    const path = contact?.patient.photo_url;
+    const path = activePatient?.photo_url;
     if (!path) {
       setPhotoDataUri(null);
       return;
@@ -190,7 +198,7 @@ export default function FamilyHomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [contact?.patient.photo_url]);
+  }, [activePatient?.photo_url]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -235,11 +243,11 @@ export default function FamilyHomeScreen({
   }
 
   async function handleRequestCamera() {
-    if (!contact) return;
+    if (!activePatient) return;
     setRequestingCamera(true);
     try {
       await requestCamera();
-      onOpenCamera(contact.patient.id, contact.patient.name);
+      onOpenCamera(activePatient.id, activePatient.name);
     } catch {
       Alert.alert('Erro', 'Não foi possível solicitar a câmera agora.');
     } finally {
@@ -264,7 +272,7 @@ export default function FamilyHomeScreen({
         <WebView
           style={styles.map}
           originWhitelist={['*']}
-          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, contact?.patient.name ?? '', photoDataUri) }}
+          source={{ html: buildMapHtml(location.lat, location.lng, safeRadius, activePatient?.name ?? '', photoDataUri) }}
           onError={() => setMapError(true)}
           onHttpError={() => setMapError(true)}
           onMessage={(e) => {
@@ -288,10 +296,15 @@ export default function FamilyHomeScreen({
           </View>
           <View style={styles.headerNames}>
             <Text style={styles.greeting}>{contact?.name}</Text>
-            <Text style={styles.headerPatientName}>{contact?.patient.name}</Text>
+            <Text style={styles.headerPatientName}>{activePatient?.name}</Text>
           </View>
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          {(contact?.patients.length ?? 0) > 1 && (
+            <TouchableOpacity onPress={onSwitchPatient} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={styles.refreshIcon}>🔁</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={handleRefresh} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} disabled={refreshing}>
             {refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.refreshIcon}>↻</Text>}
           </TouchableOpacity>
@@ -315,15 +328,15 @@ export default function FamilyHomeScreen({
       )}
 
       <View style={[styles.statusCard, { bottom: insets.bottom + 96 }]}>
-        {contact?.patient.photo_url ? (
-          <AuthImage path={contact.patient.photo_url} style={styles.statusPhoto} />
+        {activePatient?.photo_url ? (
+          <AuthImage path={activePatient?.photo_url} style={styles.statusPhoto} />
         ) : (
           <View style={[styles.statusPhoto, styles.statusPhotoPlaceholder]}>
-            <Text style={styles.statusPhotoInitial}>{contact?.patient.name?.[0] ?? '?'}</Text>
+            <Text style={styles.statusPhotoInitial}>{activePatient?.name?.[0] ?? '?'}</Text>
           </View>
         )}
         <View style={styles.statusInfo}>
-          <Text style={styles.statusName}>{contact?.patient.name}</Text>
+          <Text style={styles.statusName}>{activePatient?.name}</Text>
           <Text style={styles.statusAddress} numberOfLines={1}>
             {address ?? (location ? 'Localização não identificada' : 'Sem localização')}
           </Text>
@@ -370,7 +383,7 @@ export default function FamilyHomeScreen({
               <View style={styles.pendingRow}>
                 <Text style={styles.pendingTitle}>📍 Nova localização de "minha casa"</Text>
                 <Text style={styles.pendingDetail}>
-                  {contact?.patient.name} solicitou definir a localização atual como área segura
+                  {activePatient?.name} solicitou definir a localização atual como área segura
                   {pending.geofence.pending_safe_radius_m ? ` (raio de ${pending.geofence.pending_safe_radius_m} m)` : ''}.
                 </Text>
                 <View style={styles.actionsRow}>
