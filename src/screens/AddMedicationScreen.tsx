@@ -21,6 +21,7 @@ import { getDrugCatalog, requestMedication, type Drug } from '../services/patien
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
 import MedicationIdentifierPicker from '../components/MedicationIdentifierPicker';
+import WeekdaysPicker from '../components/WeekdaysPicker';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
@@ -37,6 +38,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
   const [medType, setMedType] = useState<'continuous' | 'period'>('continuous');
   const [identifierColor, setIdentifierColor] = useState<string | null>(null);
   const [identifierNumber, setIdentifierNumber] = useState('');
+  const [weekdays, setWeekdays] = useState<number[]>([]);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -102,6 +104,7 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         identifier_color: identifierColor,
         identifier_number: identifierNumber ? Number(identifierNumber) : null,
         schedule_times: scheduleTimes,
+        weekdays: weekdays.length ? weekdays : null,
         start_date: new Date().toISOString().slice(0, 10),
         end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
         notes: notes || undefined,
@@ -259,6 +262,8 @@ export default function AddMedicationScreen({ onBack, onSaved }: { onBack: () =>
         number={identifierNumber}
         onNumberChange={setIdentifierNumber}
       />
+
+      <WeekdaysPicker accent={colors.green} value={weekdays} onChange={setWeekdays} />
 
       <TextInput
         style={[styles.input, styles.notesInput]}

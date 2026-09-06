@@ -49,6 +49,7 @@ export interface Medication {
   start_date?: string;
   end_date?: string | null;
   schedule_times: string[];
+  weekdays?: number[] | null;
   today_adherence: 'taken' | 'pending' | 'missed' | 'late' | 'refused' | 'out_of_stock';
   // 'awaiting_restock' = paciente avisou pela Alexa que acabou; a equipe libera pelo painel web
   stock_status?: 'ok' | 'awaiting_restock';

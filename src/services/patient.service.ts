@@ -56,6 +56,7 @@ export interface NewMedicationInput {
   identifier_color?: string | null;
   identifier_number?: number | null;
   schedule_times: string[];
+  weekdays?: number[] | null;
   start_date: string;
   end_date?: string;
   notes?: string;

@@ -23,6 +23,7 @@ import type { Medication } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 import { FREQUENCIES, computeScheduleTimes, isManualFrequency } from '../utils/medicationSchedule';
 import MedicationIdentifierPicker from '../components/MedicationIdentifierPicker';
+import WeekdaysPicker from '../components/WeekdaysPicker';
 
 function formatTime(d: Date) {
   return d.toTimeString().slice(0, 5);
@@ -48,6 +49,7 @@ export default function FamilyAddMedicationScreen({
   const [medType, setMedType] = useState<'continuous' | 'period'>(medication?.type ?? 'continuous');
   const [identifierColor, setIdentifierColor] = useState<string | null>(medication?.identifier_color ?? null);
   const [identifierNumber, setIdentifierNumber] = useState(medication?.identifier_number != null ? String(medication.identifier_number) : '');
+  const [weekdays, setWeekdays] = useState<number[]>(medication?.weekdays ?? []);
   const [endDate, setEndDate] = useState<Date | null>(medication?.end_date ? new Date(medication.end_date) : null);
   const [notes, setNotes] = useState(medication?.notes ?? '');
   const [saving, setSaving] = useState(false);
@@ -118,6 +120,7 @@ export default function FamilyAddMedicationScreen({
           identifier_color: identifierColor,
           identifier_number: identifierNumber ? Number(identifierNumber) : null,
           schedule_times: scheduleTimes,
+          weekdays: weekdays.length ? weekdays : null,
           end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
           notes: notes || undefined,
         });
@@ -131,6 +134,7 @@ export default function FamilyAddMedicationScreen({
           identifier_color: identifierColor,
           identifier_number: identifierNumber ? Number(identifierNumber) : null,
           schedule_times: scheduleTimes,
+          weekdays: weekdays.length ? weekdays : null,
           start_date: new Date().toISOString().slice(0, 10),
           end_date: medType === 'period' && endDate ? endDate.toISOString().slice(0, 10) : undefined,
           notes: notes || undefined,
@@ -311,6 +315,8 @@ export default function FamilyAddMedicationScreen({
         number={identifierNumber}
         onNumberChange={setIdentifierNumber}
       />
+
+      <WeekdaysPicker accent={colors.blue} value={weekdays} onChange={setWeekdays} />
 
       <TextInput
         style={[styles.input, styles.notesInput]}
