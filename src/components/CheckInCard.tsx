@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { sendCheckIn } from '../services/patient.service';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
@@ -13,6 +17,38 @@ export default function CheckInCard() {
   const [askingWhat, setAskingWhat] = useState(false);
   const [notes, setNotes] = useState('');
   const [sending, setSending] = useState(false);
+  const [listening, setListening] = useState(false);
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript;
+    if (transcript) setNotes(transcript);
+  });
+
+  useSpeechRecognitionEvent('end', () => setListening(false));
+
+  useSpeechRecognitionEvent('error', () => {
+    setListening(false);
+    Alert.alert('Não entendi', 'Não consegui ouvir direito. Você pode tentar de novo ou escrever.');
+  });
+
+  async function handleToggleListening() {
+    if (listening) {
+      ExpoSpeechRecognitionModule.stop();
+      return;
+    }
+    const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permissão necessária', 'Autorize o microfone para falar como está se sentindo.');
+      return;
+    }
+    setNotes('');
+    setListening(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: 'pt-BR',
+      interimResults: true,
+      continuous: false,
+    });
+  }
 
   async function handlePress(status: 'ok' | 'attention') {
     if (status === 'attention') {
@@ -77,6 +113,15 @@ export default function CheckInCard() {
               autoFocus
             />
             <TouchableOpacity
+              style={[styles.micButton, listening && styles.micButtonActive]}
+              onPress={handleToggleListening}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.micButtonText}>
+                {listening ? '🔴 Ouvindo... toque para parar' : '🎤 Ou toque aqui e fale'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.sendButton}
               onPress={handleSendAttention}
               disabled={sending}
@@ -87,6 +132,7 @@ export default function CheckInCard() {
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => {
+                if (listening) ExpoSpeechRecognitionModule.stop();
                 setAskingWhat(false);
                 setNotes('');
               }}
@@ -181,6 +227,25 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     marginBottom: spacing.md,
+  },
+  micButton: {
+    width: '100%',
+    height: buttonHeight,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  micButtonActive: {
+    borderColor: colors.red,
+    backgroundColor: colors.surface,
+  },
+  micButtonText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: typography.label,
   },
   sendButton: {
     width: '100%',

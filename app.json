@@ -111,6 +111,13 @@
             "minSdkVersion": 26
           }
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O UnifCare usa o microfone para você contar como está se sentindo por voz.",
+          "speechRecognitionPermission": "O UnifCare usa reconhecimento de fala para transcrever o que você disser sobre como está se sentindo."
+        }
       ]
     ],
     "extra": {
