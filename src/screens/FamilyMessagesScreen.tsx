@@ -3,7 +3,8 @@ import {
   ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getFamilyMessages, sendFamilyMessage } from '../services/family.service';
+import * as Speech from 'expo-speech';
+import { getAlexaPreview, getFamilyMessages, sendFamilyMessage } from '../services/family.service';
 import type { AlexaMessage } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
 
@@ -18,6 +19,8 @@ export default function FamilyMessagesScreen({ onBack }: { onBack: () => void })
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const insets = useSafeAreaInsets();
 
   const load = useCallback(() => {
@@ -27,6 +30,28 @@ export default function FamilyMessagesScreen({ onBack }: { onBack: () => void })
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    return () => { Speech.stop(); };
+  }, []);
+
+  async function handlePreview() {
+    if (speaking) {
+      Speech.stop();
+      setSpeaking(false);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const { text } = await getAlexaPreview();
+      setSpeaking(true);
+      Speech.speak(text, { language: 'pt-BR', onDone: () => setSpeaking(false), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
+    } catch {
+      // silently fail — preview issues surface via the button not doing anything
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   async function handleSend() {
     const text = body.trim();
@@ -78,6 +103,13 @@ export default function FamilyMessagesScreen({ onBack }: { onBack: () => void })
         </View>
         {error && <Text style={styles.error}>{error}</Text>}
         {feedback && <Text style={styles.feedback}>{feedback}</Text>}
+        <TouchableOpacity style={styles.previewButton} onPress={handlePreview} disabled={previewLoading} activeOpacity={0.75}>
+          {previewLoading ? (
+            <ActivityIndicator color={colors.blueDark} />
+          ) : (
+            <Text style={styles.previewButtonText}>{speaking ? '⏹ Parar' : '🔊 Ouvir como a Alexa vai falar'}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -172,6 +204,17 @@ const styles = StyleSheet.create({
   sendButtonText: { color: '#fff', fontWeight: '700', fontSize: typography.label },
   error: { color: colors.red, marginTop: spacing.sm, fontSize: 14 },
   feedback: { color: colors.blueDark, marginTop: spacing.sm, fontSize: 14 },
+  previewButton: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.blueSurface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  previewButtonText: { color: colors.blueDark, fontWeight: '700', fontSize: 13 },
   muted: { fontSize: typography.label, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
   card: {
     backgroundColor: colors.card,

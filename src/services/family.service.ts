@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AlertEvent, AlexaMessage, Appointment, ExamResult, FamilyContact, Medication, PendingApprovals, TimelineItem, VitalSign } from '../types';
+import type { AlertEvent, AlexaMessage, Appointment, ExamResult, FamilyContact, Medication, PatientContact, PendingApprovals, TimelineItem, VitalSign } from '../types';
 import type { Drug } from './patient.service';
 
 export function familyMe(): Promise<FamilyContact> {
@@ -88,6 +88,11 @@ export function sendFamilyMessage(body: string): Promise<AlexaMessage> {
   return api.post<AlexaMessage>('/family/messages', { body });
 }
 
+// Iteração 4 Alexa (F4c) — ouvir como a Alexa vai falar
+export function getAlexaPreview(): Promise<{ text: string; ssml: string }> {
+  return api.get<{ text: string; ssml: string }>('/family/alexa/preview');
+}
+
 // Iteração 3 Alexa (F2) — linha do tempo (check-ins + sintomas/medições por voz)
 export function getFamilyTimeline(days = 14): Promise<{ days: number; items: TimelineItem[] }> {
   return api.get<{ days: number; items: TimelineItem[] }>(`/family/timeline?days=${days}`);
@@ -165,10 +170,27 @@ export interface NewAppointmentInput {
   professional?: string;
   location?: string;
   notes?: string;
+  preparation_instructions?: string;
+  companion_contact_id?: number | null;
 }
 
 export function createFamilyAppointment(data: NewAppointmentInput): Promise<Appointment> {
   return api.post<Appointment>('/family/appointments', data);
+}
+
+// Iteração 4 F1 — próximas consultas (30 dias) do paciente ativo, com preparo/acompanhante/presença.
+export function getUpcomingAppointments(): Promise<Appointment[]> {
+  return api.get<Appointment[]>('/family/appointments/upcoming');
+}
+
+// Presença confirmada/negada pela família — "não vai" abre alerta pra equipe remarcar.
+export function setAppointmentAttendance(uuid: string, status: 'confirmed' | 'not_going'): Promise<Appointment> {
+  return api.put<Appointment>(`/family/appointments/${uuid}/attendance`, { status });
+}
+
+// Contatos vinculados ao paciente ativo (pra escolher o acompanhante da consulta).
+export function getFamilyContacts(): Promise<PatientContact[]> {
+  return api.get<PatientContact[]>('/family/contacts');
 }
 
 export interface NewExamInput {

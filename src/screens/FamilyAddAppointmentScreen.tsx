@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,8 +15,12 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createFamilyAppointment } from '../services/family.service';
+import { createFamilyAppointment, getFamilyContacts, getUpcomingAppointments, setAppointmentAttendance } from '../services/family.service';
+import type { Appointment, PatientContact } from '../types';
 import { colors, spacing, typography, buttonHeight } from '../theme';
+
+const PREPARATION_MAX = 300;
+const TYPE_LABEL: Record<string, string> = { consulta: 'Consulta', exame: 'Exame', retorno: 'Retorno', outro: 'Compromisso' };
 
 function formatDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -45,10 +49,46 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
   const [professional, setProfessional] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [preparation, setPreparation] = useState('');
+  const [companionId, setCompanionId] = useState<number | null>(null);
+  const [contacts, setContacts] = useState<PatientContact[]>([]);
+  const [upcoming, setUpcoming] = useState<Appointment[]>([]);
+  const [attendanceBusy, setAttendanceBusy] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const loadUpcoming = useCallback(() => {
+    getUpcomingAppointments().then(setUpcoming).catch(() => setUpcoming([]));
+  }, []);
+
+  useEffect(() => {
+    getFamilyContacts().then(setContacts).catch(() => setContacts([]));
+    loadUpcoming();
+  }, [loadUpcoming]);
+
+  function handleAttendance(appt: Appointment, status: 'confirmed' | 'not_going') {
+    const run = async () => {
+      setAttendanceBusy(appt.uuid);
+      try {
+        await setAppointmentAttendance(appt.uuid, status);
+        loadUpcoming();
+      } catch {
+        Alert.alert('Erro', 'Não foi possível registrar a presença. Tente novamente.');
+      } finally {
+        setAttendanceBusy(null);
+      }
+    };
+    if (status === 'not_going') {
+      Alert.alert('Não vai à consulta', 'A equipe será avisada para remarcar. Confirmar?', [
+        { text: 'Voltar', style: 'cancel' },
+        { text: 'Não vai', style: 'destructive', onPress: run },
+      ]);
+    } else {
+      run();
+    }
+  }
 
   async function handleSubmit() {
     if (!date || !time) {
@@ -65,6 +105,8 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
         professional: professional || undefined,
         location: location || undefined,
         notes: notes || undefined,
+        preparation_instructions: preparation.trim() || undefined,
+        companion_contact_id: companionId,
       });
       Alert.alert('Agendado', 'A consulta foi cadastrada para o paciente.');
       onSaved();
@@ -91,6 +133,42 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
 
       <KeyboardAvoidingView style={styles.scroll} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardShouldPersistTaps="handled">
+      {upcoming.length > 0 && (
+        <View style={styles.upcomingBlock}>
+          <Text style={styles.sectionTitle}>Próximas consultas</Text>
+          {upcoming.map((appt) => {
+            const attendance = appt.attendance_status ?? 'pending';
+            return (
+              <View key={appt.uuid} style={styles.upcomingCard}>
+                <Text style={styles.upcomingTitle}>
+                  🗓️ {formatDateLabel(appt.appointment_date)} às {appt.appointment_time.slice(0, 5)} · {TYPE_LABEL[appt.type] ?? appt.type}
+                </Text>
+                {(appt.professional || appt.location) && (
+                  <Text style={styles.upcomingDetail}>{[appt.professional, appt.location].filter(Boolean).join(' • ')}</Text>
+                )}
+                {appt.preparation_instructions ? <Text style={styles.upcomingDetail}>📋 {appt.preparation_instructions}</Text> : null}
+                {appt.companion ? <Text style={styles.upcomingDetail}>👥 Acompanhante: {appt.companion.name}</Text> : null}
+                {attendance === 'confirmed' ? (
+                  <Text style={styles.attendanceOk}>✅ Presença confirmada</Text>
+                ) : attendance === 'not_going' ? (
+                  <Text style={styles.attendanceNo}>⚠️ Não vai — equipe avisada para remarcar</Text>
+                ) : (
+                  <View style={styles.attendanceRow}>
+                    <TouchableOpacity style={styles.attendanceNoButton} disabled={attendanceBusy === appt.uuid} onPress={() => handleAttendance(appt, 'not_going')}>
+                      <Text style={styles.attendanceNoButtonText}>Não vai</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.attendanceYesButton} disabled={attendanceBusy === appt.uuid} onPress={() => handleAttendance(appt, 'confirmed')}>
+                      {attendanceBusy === appt.uuid ? <ActivityIndicator color="#fff" /> : <Text style={styles.attendanceYesButtonText}>Vai</Text>}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      <Text style={styles.sectionTitle}>Agendar nova consulta</Text>
       <Text style={styles.subtitle}>Agendada direto para o paciente, sem precisar de aprovação.</Text>
 
       <View style={styles.typeRow}>
@@ -156,6 +234,33 @@ export default function FamilyAddAppointmentScreen({ onBack, onSaved }: { onBack
         onChangeText={setNotes}
         multiline
       />
+
+      <Text style={styles.fieldLabel}>Preparo — a Alexa lê isso na véspera e no dia ({preparation.length}/{PREPARATION_MAX})</Text>
+      <TextInput
+        style={[styles.input, styles.notesInput]}
+        placeholder="Ex.: ficar em jejum de 8 horas, levar os exames"
+        placeholderTextColor={colors.hint}
+        value={preparation}
+        onChangeText={setPreparation}
+        maxLength={PREPARATION_MAX}
+        multiline
+      />
+
+      {contacts.length > 0 && (
+        <>
+          <Text style={styles.fieldLabel}>Quem vai junto? (a Alexa avisa o paciente)</Text>
+          <View style={styles.typeRow}>
+            <TouchableOpacity style={[styles.typeChip, companionId === null && styles.typeChipActive]} onPress={() => setCompanionId(null)}>
+              <Text style={[styles.typeChipText, companionId === null && styles.typeChipTextActive]}>Ninguém</Text>
+            </TouchableOpacity>
+            {contacts.map((c) => (
+              <TouchableOpacity key={c.id} style={[styles.typeChip, companionId === c.id && styles.typeChipActive]} onPress={() => setCompanionId(c.id)}>
+                <Text style={[styles.typeChipText, companionId === c.id && styles.typeChipTextActive]}>{c.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Agendar</Text>}
@@ -241,4 +346,26 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   buttonText: { color: '#fff', fontSize: typography.subtitle, fontWeight: '700' },
+  // Iteração 4 F1
+  sectionTitle: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text, marginTop: spacing.md },
+  fieldLabel: { fontSize: typography.label, color: colors.muted, marginBottom: 4 },
+  upcomingBlock: { marginBottom: spacing.md },
+  upcomingCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  upcomingTitle: { fontSize: typography.label, fontWeight: '700', color: colors.text },
+  upcomingDetail: { fontSize: 14, color: colors.muted },
+  attendanceOk: { fontSize: 14, color: colors.green, fontWeight: '700', marginTop: 4 },
+  attendanceNo: { fontSize: 14, color: colors.red, fontWeight: '700', marginTop: 4 },
+  attendanceRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  attendanceYesButton: { flex: 1, backgroundColor: colors.blue, paddingVertical: spacing.sm, borderRadius: 10, alignItems: 'center' },
+  attendanceYesButtonText: { color: '#fff', fontWeight: '700' },
+  attendanceNoButton: { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.red, paddingVertical: spacing.sm, borderRadius: 10, alignItems: 'center' },
+  attendanceNoButtonText: { color: colors.red, fontWeight: '700' },
 });

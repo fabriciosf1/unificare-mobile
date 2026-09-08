@@ -68,6 +68,12 @@ export interface Appointment {
   status: string;
   approval_status: 'approved' | 'pending' | 'rejected';
   notes: string | null;
+  // Iteração 4 F1 — falado pela Alexa na véspera/dia
+  preparation_instructions?: string | null;
+  companion_contact_id?: number | null;
+  attendance_status?: 'pending' | 'confirmed' | 'not_going';
+  attendance_confirmed_by?: 'alexa' | 'family' | 'staff' | null;
+  companion?: { id: number; uuid: string; name: string } | null;
 }
 
 export interface PatientContact {
