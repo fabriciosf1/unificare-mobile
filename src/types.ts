@@ -124,6 +124,57 @@ export interface AlertEvent {
   created_at: string;
 }
 
+// Iteração 3 Alexa (F1): recado família/equipe ↔ paciente
+export interface AlexaMessage {
+  id: number;
+  uuid: string;
+  author_type: 'contact' | 'user' | 'patient';
+  author_name: string;
+  direction: 'to_patient' | 'from_patient';
+  recipient_contact?: { id: number; uuid: string; name: string } | null;
+  body: string;
+  status: 'draft' | 'sent';
+  read_at: string | null;
+  delivered_via: 'voice' | 'app' | 'web' | null;
+  is_alert: boolean;
+  created_at: string;
+}
+
+// Iteração 3 Alexa (F2): linha do tempo — check-ins + sintomas/medições ditos por voz
+export type HealthSeverity = 'normal' | 'attention' | 'critical';
+
+export interface TimelineHealthEvent {
+  type: 'health_event';
+  id: number;
+  uuid: string;
+  at: string;
+  kind: 'symptom' | 'measurement';
+  subtype: string;
+  label: string;
+  value: number | null;
+  value_secondary: number | null;
+  unit: string | null;
+  raw_text: string | null;
+  source: string;
+  severity: HealthSeverity;
+  confirmation_pending: boolean;
+  alert: { uuid: string; status: string; severity: string; type: string } | null;
+}
+
+export interface TimelineCheckIn {
+  type: 'checkin';
+  id: number;
+  uuid: string;
+  at: string;
+  status: string;
+  channel: string;
+  notes: string | null;
+  transcript: string | null;
+  escalated: boolean;
+}
+
+export type TimelineItem = TimelineHealthEvent | TimelineCheckIn;
+
 export interface ExamResult {
   uuid: string;
   exam_type: string;

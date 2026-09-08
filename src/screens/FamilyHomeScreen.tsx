@@ -115,6 +115,8 @@ export default function FamilyHomeScreen({
   onLoggedOut,
   onOpenAlerts,
   onOpenMedications,
+  onOpenMessages,
+  onOpenTimeline,
   onOpenCamera,
   onOpenAddExam,
   onOpenAddAppointment,
@@ -124,6 +126,8 @@ export default function FamilyHomeScreen({
   onLoggedOut: () => void;
   onOpenAlerts: () => void;
   onOpenMedications: () => void;
+  onOpenMessages: () => void;
+  onOpenTimeline: () => void;
   onOpenCamera: (patientId: number, patientName: string) => void;
   onOpenAddExam: () => void;
   onOpenAddAppointment: () => void;
@@ -352,6 +356,14 @@ export default function FamilyHomeScreen({
         <TouchableOpacity style={styles.footerItem} onPress={onOpenMedications} activeOpacity={0.75}>
           <Text style={styles.footerIcon}>💊</Text>
           <Text style={styles.footerLabel}>Remédios</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenMessages} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>✉️</Text>
+          <Text style={styles.footerLabel}>Recados</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerItem} onPress={onOpenTimeline} activeOpacity={0.75}>
+          <Text style={styles.footerIcon}>🩺</Text>
+          <Text style={styles.footerLabel}>Saúde</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.footerItem} onPress={handleRequestCamera} activeOpacity={0.75} disabled={requestingCamera}>
           {requestingCamera ? (

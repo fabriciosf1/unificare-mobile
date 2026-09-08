@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AlertEvent, Appointment, ExamResult, FamilyContact, Medication, PendingApprovals, VitalSign } from '../types';
+import type { AlertEvent, AlexaMessage, Appointment, ExamResult, FamilyContact, Medication, PendingApprovals, TimelineItem, VitalSign } from '../types';
 import type { Drug } from './patient.service';
 
 export function familyMe(): Promise<FamilyContact> {
@@ -77,6 +77,20 @@ export function registerFamilyPushToken(expoPushToken: string, platform: string)
 
 export function getFamilyAlerts(): Promise<{ data: AlertEvent[] }> {
   return api.get<{ data: AlertEvent[] }>('/family/alerts');
+}
+
+// Iteração 3 Alexa (F1) — recados
+export function getFamilyMessages(): Promise<{ data: AlexaMessage[] }> {
+  return api.get<{ data: AlexaMessage[] }>('/family/messages');
+}
+
+export function sendFamilyMessage(body: string): Promise<AlexaMessage> {
+  return api.post<AlexaMessage>('/family/messages', { body });
+}
+
+// Iteração 3 Alexa (F2) — linha do tempo (check-ins + sintomas/medições por voz)
+export function getFamilyTimeline(days = 14): Promise<{ days: number; items: TimelineItem[] }> {
+  return api.get<{ days: number; items: TimelineItem[] }>(`/family/timeline?days=${days}`);
 }
 
 export function getFamilyMedicationsToday(): Promise<Medication[]> {

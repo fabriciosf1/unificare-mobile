@@ -33,6 +33,8 @@ import WearableSetupScreen from './src/screens/WearableSetupScreen';
 import FamilyHomeScreen from './src/screens/FamilyHomeScreen';
 import FamilyProfileScreen from './src/screens/FamilyProfileScreen';
 import FamilyAlertsScreen from './src/screens/FamilyAlertsScreen';
+import FamilyMessagesScreen from './src/screens/FamilyMessagesScreen';
+import FamilyTimelineScreen from './src/screens/FamilyTimelineScreen';
 import FamilyMedicationsScreen from './src/screens/FamilyMedicationsScreen';
 import FamilyAddExamScreen from './src/screens/FamilyAddExamScreen';
 import FamilyEditExamScreen from './src/screens/FamilyEditExamScreen';
@@ -46,7 +48,7 @@ import { colors } from './src/theme';
 import type { ExamResult, Medication } from './src/types';
 
 type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares' | 'wearableSetup';
-type FamilyScreen = 'loading' | 'selectPatient' | 'home' | 'watchSos' | 'alerts' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
+type FamilyScreen = 'loading' | 'selectPatient' | 'home' | 'watchSos' | 'alerts' | 'messages' | 'timeline' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
@@ -420,6 +422,8 @@ export default function App() {
           onLoggedOut={handleLoggedOut}
           onOpenAlerts={() => setFamilyScreen('alerts')}
           onOpenMedications={() => setFamilyScreen('medications')}
+          onOpenMessages={() => setFamilyScreen('messages')}
+          onOpenTimeline={() => setFamilyScreen('timeline')}
           onOpenCamera={(patientId, patientName) => {
             setSosCall({ patientId, patientName });
             setFamilyScreen('watchSos');
@@ -435,6 +439,12 @@ export default function App() {
       )}
       {loggedIn && role === 'family' && familyScreen === 'alerts' && (
         <FamilyAlertsScreen onBack={() => setFamilyScreen('home')} />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'messages' && (
+        <FamilyMessagesScreen onBack={() => setFamilyScreen('home')} />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'timeline' && (
+        <FamilyTimelineScreen onBack={() => setFamilyScreen('home')} />
       )}
       {loggedIn && role === 'family' && familyScreen === 'medications' && (
         <FamilyMedicationsScreen
