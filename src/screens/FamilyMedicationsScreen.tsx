@@ -204,18 +204,20 @@ export default function FamilyMedicationsScreen({
                       <Text style={[styles.doseStatus, dose.is_late && styles.doseStatusLate]}>
                         {dose.is_late ? 'Atrasado' : 'Aguardando'}
                       </Text>
-                      <TouchableOpacity
-                        style={styles.confirmButton}
-                        onPress={() => handleConfirmDose(med, dose)}
-                        disabled={isConfirming}
-                        activeOpacity={0.75}
-                      >
-                        {isConfirming ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={styles.confirmButtonText}>Tomei</Text>
-                        )}
-                      </TouchableOpacity>
+                      {dose.is_late && (
+                        <TouchableOpacity
+                          style={styles.confirmButton}
+                          onPress={() => handleConfirmDose(med, dose)}
+                          disabled={isConfirming}
+                          activeOpacity={0.75}
+                        >
+                          {isConfirming ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={styles.confirmButtonText}>Tomei</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ) : (
                     <Text style={[styles.doseStatus, styles.doseStatusTaken]}>✓ Tomado</Text>

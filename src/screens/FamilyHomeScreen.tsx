@@ -145,6 +145,7 @@ export default function FamilyHomeScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [requestingCamera, setRequestingCamera] = useState(false);
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [photoDataUri, setPhotoDataUri] = useState<string | null>(null);
   const [mapError, setMapError] = useState(false);
   const insets = useSafeAreaInsets();
@@ -348,41 +349,91 @@ export default function FamilyHomeScreen({
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenAlerts} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>🚨</Text>
-          <Text style={styles.footerLabel}>Alertas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenMedications} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>💊</Text>
-          <Text style={styles.footerLabel}>Remédios</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenMessages} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>✉️</Text>
-          <Text style={styles.footerLabel}>Recados</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenTimeline} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>🩺</Text>
-          <Text style={styles.footerLabel}>Saúde</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={handleRequestCamera} activeOpacity={0.75} disabled={requestingCamera}>
-          {requestingCamera ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.footerIcon}>📹</Text>
-              <Text style={styles.footerLabel}>Câmera</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenAddExam} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>📄</Text>
-          <Text style={styles.footerLabel}>Documento</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.footerItem} onPress={onOpenAddAppointment} activeOpacity={0.75}>
-          <Text style={styles.footerIcon}>🗓️</Text>
-          <Text style={styles.footerLabel}>Consulta</Text>
-        </TouchableOpacity>
+      <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+        {moreOpen && (
+          <View style={styles.moreOverlay}>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                onOpenMessages();
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerIcon}>✉️</Text>
+              <Text style={styles.footerLabel}>Recados</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                onOpenTimeline();
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerIcon}>🩺</Text>
+              <Text style={styles.footerLabel}>Saúde</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                handleRequestCamera();
+              }}
+              activeOpacity={0.75}
+              disabled={requestingCamera}
+            >
+              {requestingCamera ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.footerIcon}>📹</Text>
+                  <Text style={styles.footerLabel}>Câmera</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                onOpenAddExam();
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerIcon}>📄</Text>
+              <Text style={styles.footerLabel}>Documento</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                onOpenAddAppointment();
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerIcon}>🗓️</Text>
+              <Text style={styles.footerLabel}>Consulta</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.footerItem} onPress={onOpenAlerts} activeOpacity={0.75}>
+            <Text style={styles.footerIcon}>🚨</Text>
+            <Text style={styles.footerLabel}>Alertas</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.footerItem} onPress={onOpenMedications} activeOpacity={0.75}>
+            <Text style={styles.footerIcon}>💊</Text>
+            <Text style={styles.footerLabel}>Remédios</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.footerItem, moreOpen && styles.footerItemActive]}
+            onPress={() => setMoreOpen((v) => !v)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.footerIcon}>{moreOpen ? '✕' : '⋯'}</Text>
+            <Text style={styles.footerLabel}>{moreOpen ? 'Fechar' : 'Mais'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal visible={pendingModalOpen} animationType="slide" transparent onRequestClose={() => setPendingModalOpen(false)}>
@@ -550,11 +601,13 @@ const styles = StyleSheet.create({
   statusName: { fontSize: typography.subtitle, fontWeight: '700', color: colors.text },
   statusAddress: { fontSize: 14, color: colors.muted, marginTop: 2 },
   statusSince: { fontSize: 13, color: colors.hint, marginTop: 2, fontWeight: '600' },
-  footer: {
+  footerContainer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  footer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(11,41,71,0.85)',
     paddingTop: spacing.sm,
@@ -571,8 +624,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
+  footerItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
   footerIcon: { fontSize: 22 },
   footerLabel: { fontSize: 13, fontWeight: '700', color: '#fff', marginTop: 2 },
+  moreOverlay: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: 'rgba(11,41,71,0.95)',
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: 4,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+  moreItem: {
+    width: '30%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 4,
+  },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: colors.card,
