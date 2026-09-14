@@ -115,6 +115,7 @@ export default function FamilyHomeScreen({
   onLoggedOut,
   onOpenAlerts,
   onOpenMedications,
+  onOpenGuidances,
   onOpenMessages,
   onOpenTimeline,
   onOpenCamera,
@@ -126,6 +127,7 @@ export default function FamilyHomeScreen({
   onLoggedOut: () => void;
   onOpenAlerts: () => void;
   onOpenMedications: () => void;
+  onOpenGuidances: () => void;
   onOpenMessages: () => void;
   onOpenTimeline: () => void;
   onOpenCamera: (patientId: number, patientName: string) => void;
@@ -413,6 +415,17 @@ export default function FamilyHomeScreen({
             >
               <Text style={styles.footerIcon}>🗓️</Text>
               <Text style={styles.footerLabel}>Consulta</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreItem}
+              onPress={() => {
+                setMoreOpen(false);
+                onOpenGuidances();
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.footerIcon}>📋</Text>
+              <Text style={styles.footerLabel}>Orientações</Text>
             </TouchableOpacity>
           </View>
         )}

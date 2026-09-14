@@ -40,15 +40,17 @@ import FamilyAddExamScreen from './src/screens/FamilyAddExamScreen';
 import FamilyEditExamScreen from './src/screens/FamilyEditExamScreen';
 import FamilyExamsScreen from './src/screens/FamilyExamsScreen';
 import FamilyAddMedicationScreen from './src/screens/FamilyAddMedicationScreen';
+import FamilyGuidancesScreen from './src/screens/FamilyGuidancesScreen';
+import FamilyAddGuidanceScreen from './src/screens/FamilyAddGuidanceScreen';
 import FamilyAddAppointmentScreen from './src/screens/FamilyAddAppointmentScreen';
 import FamilySelectPatientScreen from './src/screens/FamilySelectPatientScreen';
 import SosCameraScreen from './src/screens/SosCameraScreen';
 import WatchSosScreen from './src/screens/WatchSosScreen';
 import { colors } from './src/theme';
-import type { ExamResult, Medication } from './src/types';
+import type { ExamResult, MedicalGuidance, Medication } from './src/types';
 
 type PatientScreen = 'home' | 'history' | 'addMedication' | 'addAppointment' | 'exams' | 'addExam' | 'editExam' | 'sosCamera' | 'profile' | 'familiares' | 'wearableSetup';
-type FamilyScreen = 'loading' | 'selectPatient' | 'home' | 'watchSos' | 'alerts' | 'messages' | 'timeline' | 'medications' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addAppointment' | 'profile';
+type FamilyScreen = 'loading' | 'selectPatient' | 'home' | 'watchSos' | 'alerts' | 'messages' | 'timeline' | 'medications' | 'guidances' | 'exams' | 'addExam' | 'editExam' | 'addMedication' | 'editMedication' | 'addGuidance' | 'editGuidance' | 'addAppointment' | 'profile';
 type AuthScreen = 'login' | 'forgotPassword';
 
 interface SosCallData {
@@ -103,6 +105,7 @@ export default function App() {
   const [familyScreen, setFamilyScreen] = useState<FamilyScreen>('loading');
   const [sosCall, setSosCall] = useState<SosCallData | null>(null);
   const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
+  const [editingGuidance, setEditingGuidance] = useState<MedicalGuidance | null>(null);
   const [editingExam, setEditingExam] = useState<ExamResult | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const roleRef = useRef<AppRole | null>(null);
@@ -324,6 +327,13 @@ export default function App() {
           case 'addMedication':
             setFamilyScreen('medications');
             return true;
+          case 'editGuidance':
+            setEditingGuidance(null);
+            setFamilyScreen('guidances');
+            return true;
+          case 'addGuidance':
+            setFamilyScreen('guidances');
+            return true;
           case 'addExam':
             setFamilyScreen('exams');
             return true;
@@ -422,6 +432,7 @@ export default function App() {
           onLoggedOut={handleLoggedOut}
           onOpenAlerts={() => setFamilyScreen('alerts')}
           onOpenMedications={() => setFamilyScreen('medications')}
+          onOpenGuidances={() => setFamilyScreen('guidances')}
           onOpenMessages={() => setFamilyScreen('messages')}
           onOpenTimeline={() => setFamilyScreen('timeline')}
           onOpenCamera={(patientId, patientName) => {
@@ -466,6 +477,29 @@ export default function App() {
           onSaved={() => {
             setEditingMedication(null);
             setFamilyScreen('medications');
+          }}
+        />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'guidances' && (
+        <FamilyGuidancesScreen
+          onBack={() => setFamilyScreen('home')}
+          onAddGuidance={() => setFamilyScreen('addGuidance')}
+          onEditGuidance={(guidance) => {
+            setEditingGuidance(guidance);
+            setFamilyScreen('editGuidance');
+          }}
+        />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'addGuidance' && (
+        <FamilyAddGuidanceScreen onBack={() => setFamilyScreen('guidances')} onSaved={() => setFamilyScreen('guidances')} />
+      )}
+      {loggedIn && role === 'family' && familyScreen === 'editGuidance' && editingGuidance && (
+        <FamilyAddGuidanceScreen
+          guidance={editingGuidance}
+          onBack={() => setFamilyScreen('guidances')}
+          onSaved={() => {
+            setEditingGuidance(null);
+            setFamilyScreen('guidances');
           }}
         />
       )}

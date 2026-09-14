@@ -58,6 +58,20 @@ export interface Medication {
   notes?: string | null;
 }
 
+export interface MedicalGuidance {
+  uuid: string;
+  id: number;
+  content: string;
+  schedule_times: string[] | null;
+  interval_minutes: number | null;
+  window_start: string | null;
+  window_end: string | null;
+  weekdays: number[] | null;
+  start_date: string | null;
+  end_date: string | null;
+  active: boolean;
+}
+
 export interface Appointment {
   uuid: string;
   appointment_date: string;

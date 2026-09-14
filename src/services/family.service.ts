@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AlertEvent, AlexaMessage, Appointment, ExamResult, FamilyContact, Medication, PatientContact, PendingApprovals, TimelineItem, VitalSign } from '../types';
+import type { AlertEvent, AlexaMessage, Appointment, ExamResult, FamilyContact, MedicalGuidance, Medication, PatientContact, PendingApprovals, TimelineItem, VitalSign } from '../types';
 import type { Drug } from './patient.service';
 
 export function familyMe(): Promise<FamilyContact> {
@@ -161,6 +161,34 @@ export function updateFamilyMedication(uuid: string, data: UpdateMedicationInput
 
 export function deleteFamilyMedication(uuid: string): Promise<void> {
   return api.delete(`/family/medications/${uuid}`);
+}
+
+export function getFamilyGuidances(): Promise<MedicalGuidance[]> {
+  return api.get<MedicalGuidance[]>('/family/guidances');
+}
+
+export interface GuidanceInput {
+  content: string;
+  schedule_times?: string[] | null;
+  interval_minutes?: number | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  weekdays?: number[] | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  active?: boolean;
+}
+
+export function createFamilyGuidance(data: GuidanceInput): Promise<MedicalGuidance> {
+  return api.post<MedicalGuidance>('/family/guidances', data);
+}
+
+export function updateFamilyGuidance(uuid: string, data: Partial<GuidanceInput>): Promise<MedicalGuidance> {
+  return api.put<MedicalGuidance>(`/family/guidances/${uuid}`, data);
+}
+
+export function deleteFamilyGuidance(uuid: string): Promise<void> {
+  return api.delete(`/family/guidances/${uuid}`);
 }
 
 export interface NewAppointmentInput {
